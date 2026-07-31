@@ -96,7 +96,8 @@ body > * { position: relative; z-index: 2; }
 }
 .gate-or { font-size: 12px; color: var(--ink-dim); margin-bottom: 10px; }
 
-#gate-form { display: flex; gap: 10px; }
+#gate-form, #auth-form { display: flex; gap: 10px; }
+#auth-form input,
 #gate-form input {
   flex: 1;
   background: #1c1815;
@@ -107,7 +108,9 @@ body > * { position: relative; z-index: 2; }
   padding: 14px 18px;
   text-align: center;
 }
+#auth-form input:focus,
 #gate-form input:focus { outline: 2px solid var(--amber); border-color: transparent; }
+#auth-form button,
 #gate-form button {
   background: var(--amber);
   color: #221503;
@@ -116,7 +119,9 @@ body > * { position: relative; z-index: 2; }
   padding: 0 22px;
   cursor: pointer;
 }
+#auth-form button:hover,
 #gate-form button:hover { background: #ffc476; }
+#auth-msg { margin-top: 10px; text-align: center; }
 
 /* ── 헤더 ── */
 .top {

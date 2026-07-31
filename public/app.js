@@ -32,23 +32,56 @@ const esc = (s) =>
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]),
   );
 
+let accessCode = localStorage.getItem('accesscode') || '';
+
 async function api(path, method = 'GET', body) {
+  const headers = {};
+  if (body) headers['Content-Type'] = 'application/json';
+  if (accessCode) headers['x-access-code'] = accessCode;
   const res = await fetch(path, {
     method,
-    headers: body ? { 'Content-Type': 'application/json' } : undefined,
+    headers,
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && path !== '/api/auth') {
+    // 코드가 틀렸거나 서버에서 바뀜 → 인증 단계로 복귀
+    accessCode = '';
+    localStorage.removeItem('accesscode');
+    syncGate();
+  }
   if (!res.ok) throw new Error(data.error || `요청 실패 (${res.status})`);
   return data;
 }
 
 /* ── 로그인 게이트 ── */
 function syncGate() {
-  $('#gate').classList.toggle('hidden', !!me);
+  const authed = !!accessCode;
+  $('#gate').classList.toggle('hidden', authed && !!me);
+  $('#gate-auth').hidden = authed;
+  $('#gate-enter').hidden = !authed;
   $('#btn-me').innerHTML = me ? `${avatarImg(me)}${esc(me)}${avatarOf(me) ? '' : ` ${ICONS.mic}`}` : '';
-  if (!me) $('#gate-name').focus();
+  if (!authed) $('#auth-code').focus();
+  else if (!me) $('#gate-name').focus();
 }
+// 인증코드 확인 (1단계)
+$('#auth-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const code = $('#auth-code').value.trim();
+  if (!code) return;
+  const msg = $('#auth-msg');
+  try {
+    await api('/api/auth', 'POST', { code });
+    accessCode = code;
+    localStorage.setItem('accesscode', code);
+    msg.hidden = true;
+    syncGate();
+    initData();
+  } catch (err) {
+    msg.textContent = err.message;
+    msg.hidden = false;
+  }
+});
 // Slack #yb 프로필로 입장 — 선택은 localStorage에 저장되어 다음 입장부터 생략
 function renderGateProfiles() {
   $('#gate-profiles').innerHTML = members
@@ -436,8 +469,7 @@ $('#feedback-form').addEventListener('submit', async (e) => {
 });
 
 /* ── 시작 ── */
-syncGate();
-(async () => {
+async function initData() {
   try {
     members = (await api('/api/members')).members || [];
   } catch {
@@ -450,5 +482,9 @@ syncGate();
   } catch (err) {
     $('#songs').innerHTML = `<div class="empty">${esc(err.message)}</div>`;
   }
-})();
-setInterval(() => poll().catch(() => {}), 15000); // 다른 멤버 변경사항 주기 반영
+}
+syncGate();
+if (accessCode) initData();
+setInterval(() => {
+  if (accessCode) poll().catch(() => {});
+}, 15000); // 다른 멤버 변경사항 주기 반영

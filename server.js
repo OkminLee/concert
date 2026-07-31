@@ -23,6 +23,23 @@ const app = express();
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
+// ---- 입장 인증코드: 밴드 공용 코드 1개, 기기당 1회 입력 ----
+const ACCESS_CODE = process.env.ACCESS_CODE || 'yb2026';
+
+app.post('/api/auth', (req, res) => {
+  const { code } = req.body || {};
+  if (typeof code !== 'string' || code.trim() !== ACCESS_CODE)
+    return res.status(401).json({ error: '인증코드가 맞지 않아요' });
+  res.json({ ok: true });
+});
+
+// /api/auth 를 제외한 모든 API는 코드 헤더 필수
+app.use('/api', (req, res, next) => {
+  if (req.path === '/auth') return next();
+  if (req.get('x-access-code') === ACCESS_CODE) return next();
+  res.status(401).json({ error: '인증이 필요해요' });
+});
+
 function findSong(req, res) {
   const song = db.songs.find((s) => s.id === req.params.id);
   if (!song) res.status(404).json({ error: '곡을 찾을 수 없어요' });

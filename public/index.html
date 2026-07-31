@@ -17,12 +17,26 @@
     <div class="gate-inner">
       <p class="gate-kicker">ONL ENSEMBLE</p>
       <h1 class="gate-title">오늘 밤,<br />무대에 설 이름은?</h1>
-      <div id="gate-profiles" class="gate-profiles"></div>
-      <p class="gate-or" id="gate-or" hidden>목록에 없으면 직접 입력</p>
-      <form id="gate-form">
-        <input id="gate-name" type="text" maxlength="20" placeholder="닉네임" autocomplete="off" />
-        <button type="submit">입장하기</button>
-      </form>
+
+      <!-- 1단계: 인증코드 -->
+      <div id="gate-auth">
+        <p class="gate-or">합주 멤버 인증코드를 입력하세요</p>
+        <form id="auth-form">
+          <input id="auth-code" type="text" maxlength="20" placeholder="인증코드" autocomplete="off" autocapitalize="off" />
+          <button type="submit">확인</button>
+        </form>
+        <p id="auth-msg" class="parse-msg err" hidden></p>
+      </div>
+
+      <!-- 2단계: 프로필 선택 -->
+      <div id="gate-enter" hidden>
+        <div id="gate-profiles" class="gate-profiles"></div>
+        <p class="gate-or" id="gate-or" hidden>목록에 없으면 직접 입력</p>
+        <form id="gate-form">
+          <input id="gate-name" type="text" maxlength="20" placeholder="닉네임" autocomplete="off" />
+          <button type="submit">입장하기</button>
+        </form>
+      </div>
     </div>
   </div>
 
