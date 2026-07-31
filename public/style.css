@@ -39,6 +39,7 @@ body::before {
   opacity: 0.05;
   background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
   z-index: 1;
+  transform: translateZ(0); /* 컴포지터 레이어 분리 — 스크롤 시 리페인트 방지 */
 }
 body > * { position: relative; z-index: 2; }
 
@@ -399,9 +400,7 @@ input:focus { outline: 2px solid var(--amber); border-color: transparent; }
   flex-wrap: wrap;
   padding: 10px 2px;
   margin-bottom: 10px;
-  background: rgba(19, 17, 16, 0.88);
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+  background: rgba(19, 17, 16, 0.96); /* blur 대신 불투명도 — 스크롤 중 블러 연산 제거 */
 }
 .filters { display: flex; gap: 6px; flex-wrap: wrap; }
 .filter {
@@ -441,9 +440,10 @@ input:focus { outline: 2px solid var(--amber); border-color: transparent; }
   background: var(--bg-card);
   border: 1px solid var(--line);
   border-radius: var(--radius);
-  animation: rise 0.35s ease both;
   overflow: hidden;
+  contain: content; /* 행 단위 페인트 격리 — 긴 리스트 스크롤 비용 절감 */
 }
+#songs.intro .song { animation: rise 0.35s ease both; }
 .song.open { border-color: var(--amber-deep); }
 @keyframes rise {
   from { opacity: 0; transform: translateY(10px); }
@@ -522,15 +522,14 @@ input:focus { outline: 2px solid var(--amber); border-color: transparent; }
 .mini.cmt svg { width: 12px; height: 12px; }
 .row-head .caret { width: 16px; height: 16px; color: var(--ink-dim); flex-shrink: 0; transition: transform 0.25s; }
 .song.open .row-head .caret { transform: rotate(180deg); }
-/* 리스트 등장 스태거 (상위 8개까지) */
-.song:nth-child(1) { animation-delay: 0ms; }
-.song:nth-child(2) { animation-delay: 25ms; }
-.song:nth-child(3) { animation-delay: 50ms; }
-.song:nth-child(4) { animation-delay: 75ms; }
-.song:nth-child(5) { animation-delay: 100ms; }
-.song:nth-child(6) { animation-delay: 125ms; }
-.song:nth-child(7) { animation-delay: 150ms; }
-.song:nth-child(8) { animation-delay: 175ms; }
+/* 리스트 등장 스태거 (최초 로드, 상위 8개까지) */
+#songs.intro .song:nth-child(2) { animation-delay: 25ms; }
+#songs.intro .song:nth-child(3) { animation-delay: 50ms; }
+#songs.intro .song:nth-child(4) { animation-delay: 75ms; }
+#songs.intro .song:nth-child(5) { animation-delay: 100ms; }
+#songs.intro .song:nth-child(6) { animation-delay: 125ms; }
+#songs.intro .song:nth-child(7) { animation-delay: 150ms; }
+#songs.intro .song:nth-child(8) { animation-delay: 175ms; }
 
 /* 펼침 패널 */
 .song-detail {
@@ -662,21 +661,16 @@ input:focus { outline: 2px solid var(--amber); border-color: transparent; }
 .react:hover { border-color: var(--amber-deep); }
 .react.mine { border-color: var(--amber-deep); background: rgba(255, 180, 84, 0.12); color: var(--amber); }
 .react.add { border-style: dashed; color: var(--ink-dim); padding: 2px 7px; }
-.react-add-wrap { position: relative; display: inline-flex; }
+.react-add-wrap { display: inline-flex; align-items: center; gap: 4px; }
 .palette {
   display: none;
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: 0;
   background: var(--bg-raised);
   border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 5px;
+  border-radius: 999px;
+  padding: 2px 4px;
   gap: 2px;
-  z-index: 5;
-  box-shadow: 0 8px 22px rgba(0, 0, 0, 0.5);
 }
-.react-add-wrap.open .palette { display: flex; }
+.react-add-wrap.open .palette { display: inline-flex; }
 .palette button {
   background: transparent;
   border: 0;

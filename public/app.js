@@ -18,7 +18,9 @@ const REACTION_EMOJIS = ['👍', '❤️', '🔥', '😂', '👀', '🎸'];
 const avatarOf = (name) => members.find((m) => m.name === name)?.avatar;
 const avatarImg = (name, cls = 'avatar-s') => {
   const src = avatarOf(name);
-  return src ? `<img class="${cls}" src="${esc(src)}" alt="" />` : '';
+  return src
+    ? `<img class="${cls}" src="${esc(src)}" alt="" width="18" height="18" decoding="async" />`
+    : '';
 };
 
 const ICONS = {
@@ -389,7 +391,11 @@ function filterCounts() {
   });
 }
 
+// keyed diff 렌더 — 바뀐 카드만 DOM 교체 (이미지 재로드·애니메이션 재생 방지)
+const cardCache = new Map(); // song.id -> 마지막 렌더 HTML
+
 function render() {
+  const container = $('#songs');
   const visible = songs.map((s, i) => ({ s, i })).filter(({ s }) => matchesFilter(s));
   filterCounts();
   $('#song-count').textContent = !songs.length
@@ -397,25 +403,60 @@ function render() {
     : visible.length === songs.length
       ? `— ${songs.length}곡`
       : `— ${visible.length}/${songs.length}곡`;
-  $('#songs').innerHTML = !songs.length
-    ? '<div class="empty">아직 곡이 없어요. 첫 곡을 올려주세요!</div>'
-    : visible.length
-      ? visible.map(({ s, i }) => songCard(s, i)).join('')
+  if (!songs.length || !visible.length) {
+    cardCache.clear();
+    container.innerHTML = !songs.length
+      ? '<div class="empty">아직 곡이 없어요. 첫 곡을 올려주세요!</div>'
       : '<div class="empty">조건에 맞는 곡이 없어요<br /><button type="button" class="ghost" id="clear-filter">필터 초기화</button></div>';
+    return;
+  }
+  container.querySelector('.empty')?.remove();
+  const seen = new Set();
+  let anchor = null;
+  for (const { s, i } of visible) {
+    seen.add(s.id);
+    const html = songCard(s, i);
+    let el = container.querySelector(`[data-id="${s.id}"]`);
+    if (!el || cardCache.get(s.id) !== html) {
+      const tpl = document.createElement('template');
+      tpl.innerHTML = html;
+      const fresh = tpl.content.firstElementChild;
+      if (el) el.replaceWith(fresh);
+      else container.appendChild(fresh);
+      el = fresh;
+    }
+    cardCache.set(s.id, html);
+    if (anchor) {
+      if (anchor.nextElementSibling !== el) anchor.after(el);
+    } else if (container.firstElementChild !== el) {
+      container.prepend(el);
+    }
+    anchor = el;
+  }
+  for (const el of [...container.querySelectorAll('.song')]) {
+    if (!seen.has(el.dataset.id)) {
+      cardCache.delete(el.dataset.id);
+      el.remove();
+    }
+  }
 }
 
-// 단일 카드만 교체 — 스크롤·다른 카드의 입력 상태 유지
+// 서버 응답 곡 하나를 반영 — keyed diff가 해당 카드만 교체
 function updateCard(song) {
   const idx = songs.findIndex((s) => s.id === song.id);
-  if (idx === -1) return render();
-  songs[idx] = song;
-  const el = $(`.song[data-id="${song.id}"]`);
-  if (el) el.outerHTML = songCard(song, idx);
-  else render();
+  if (idx !== -1) songs[idx] = song;
+  render();
 }
 
+let firstPaint = true;
 async function load() {
   songs = (await api('/api/songs')).songs;
+  if (firstPaint) {
+    // 등장 애니메이션은 최초 로드에만 — 이후 렌더에선 재생 안 함
+    firstPaint = false;
+    $('#songs').classList.add('intro');
+    setTimeout(() => $('#songs').classList.remove('intro'), 700);
+  }
   render();
 }
 
@@ -459,9 +500,13 @@ $('#songs').addEventListener('click', async (e) => {
   try {
     switch (btn.dataset.act) {
       case 'toggle': {
-        if (expanded.has(id)) expanded.delete(id);
-        else expanded.add(id);
-        card.outerHTML = songCard(song, songs.findIndex((s) => s.id === id));
+        // DOM 재생성 없이 클래스만 토글 — 깜빡임 제거
+        const willOpen = !expanded.has(id);
+        if (willOpen) expanded.add(id);
+        else expanded.delete(id);
+        card.classList.toggle('open', willOpen);
+        btn.setAttribute('aria-expanded', willOpen);
+        cardCache.set(id, songCard(song, songs.findIndex((s) => s.id === id)));
         return;
       }
       case 'join':
