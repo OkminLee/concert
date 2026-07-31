@@ -25,7 +25,12 @@ const ICONS = {
   pencil: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg>',
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>',
   mic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4"/></svg>',
+  caret: '<svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
 };
+
+const expanded = new Set(); // 펼쳐진 곡 id — 재렌더에도 유지
+let filter = 'all';
+let query = '';
 
 const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) =>
@@ -194,7 +199,7 @@ $('#btn-parse').addEventListener('click', async () => {
 $('#song-form').addEventListener('submit', async (e) => {
   e.preventDefault();
   try {
-    await api('/api/songs', 'POST', {
+    const song = await api('/api/songs', 'POST', {
       title: $('#f-title').value,
       artist: $('#f-artist').value,
       link: $('#f-link').value,
@@ -204,10 +209,36 @@ $('#song-form').addEventListener('submit', async (e) => {
     $('#song-form').reset();
     $('#parse-msg').hidden = true;
     renderSteppers($('#f-slots'), { ...DEFAULT_SLOTS });
+    setComposer(false);
+    expanded.add(song.id); // 방금 올린 곡은 펼쳐서 보여준다
     await load();
   } catch (err) {
     alert(err.message);
   }
+});
+
+/* ── 곡 적기 접기/펼치기 ── */
+function setComposer(open) {
+  $('#composer').classList.toggle('open', open);
+  $('#composer-toggle').setAttribute('aria-expanded', open);
+}
+$('#composer-toggle').addEventListener('click', () => {
+  const open = !$('#composer').classList.contains('open');
+  setComposer(open);
+  if (open) $('#f-link').focus();
+});
+
+/* ── 필터·검색 ── */
+$('#filters').addEventListener('click', (e) => {
+  const btn = e.target.closest('.filter');
+  if (!btn) return;
+  filter = btn.dataset.filter;
+  document.querySelectorAll('.filter').forEach((b) => b.classList.toggle('on', b === btn));
+  render();
+});
+$('#search').addEventListener('input', (e) => {
+  query = e.target.value.trim().toLowerCase();
+  render();
 });
 
 /* ── 곡 리스트 ── */
@@ -279,41 +310,98 @@ function songCard(song, idx) {
     })
     .join('');
 
+  const open = expanded.has(song.id);
+  // 접힌 행의 세션 요약: 세션색 점 + 충원 현황 (모바일에선 점만)
+  const minis = SESSIONS.filter((s) => song.slots[s] > 0 || song.members[s].length > 0)
+    .map((s) => {
+      const cap = song.slots[s];
+      const cnt = song.members[s].length;
+      const cls = cnt > cap ? 'over' : cnt === cap && cap > 0 ? 'filled' : '';
+      const label = `${SESSION_META[s].label} ${cnt}/${cap}`;
+      return `<span class="mini ${cls}" title="${label}" aria-label="${label}"><i class="dot ${s}"></i><span class="mini-num ${cls}">${cnt}/${cap}</span></span>`;
+    })
+    .join('');
+  const cmt = song.comments.length
+    ? `<span class="mini cmt" title="코멘트 ${song.comments.length}개"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-8 8H4l2.5-2.7A8 8 0 1 1 21 12Z"/></svg><span class="mini-num">${song.comments.length}</span></span>`
+    : '';
+
   return `
-    <article class="song" data-id="${song.id}">
-      <div class="song-head">
+    <article class="song ${open ? 'open' : ''}" data-id="${song.id}">
+      <button type="button" class="row-head" data-act="toggle" aria-expanded="${open}">
         <span class="song-no">${String(idx + 1).padStart(2, '0')}</span>
-        <div class="titles">
-          <h3>${esc(song.title)}</h3>
-          <p class="artist">${esc(song.artist) || '&nbsp;'}
-            ${song.link ? ` · <a href="${esc(song.link)}" target="_blank" rel="noopener">곡 듣기 ↗</a>` : ''}
-          </p>
-        </div>
+        <span class="row-title">
+          <strong>${esc(song.title)}</strong>
+          ${song.artist ? `<em>${esc(song.artist)}</em>` : ''}
+        </span>
+        <span class="leader" aria-hidden="true"></span>
+        <span class="row-mini">${minis}${cmt}</span>
         <span class="badge-remain ${remain.cls}">${remain.text}</span>
-        <div class="head-btns">
-          <button type="button" class="icon-btn" data-act="edit" title="수정">${ICONS.pencil}</button>
-          <button type="button" class="icon-btn" data-act="delete" title="삭제">${ICONS.trash}</button>
+        ${ICONS.caret}
+      </button>
+      <div class="song-detail">
+        <div class="song-detail-inner">
+          <div class="detail-top">
+            <span class="detail-foot">${song.artist ? `${esc(song.artist)} · ` : ''}제안 ${esc(song.createdBy)}</span>
+            <span class="detail-meta">
+              ${song.link ? `<a href="${esc(song.link)}" target="_blank" rel="noopener">곡 듣기 ↗</a>` : ''}
+              <button type="button" class="icon-btn" data-act="edit" title="수정">${ICONS.pencil}</button>
+              <button type="button" class="icon-btn" data-act="delete" title="삭제">${ICONS.trash}</button>
+            </span>
+          </div>
+          <div class="song-body">
+            <div class="sessions">${rows || '<p class="count">세션 정원이 아직 없어요 — 수정 버튼으로 채워주세요</p>'}</div>
+            <div class="comments">
+              ${comments}
+              <form class="comment-form" data-act="comment">
+                <input type="text" maxlength="200" placeholder="하고 싶은 말" autocomplete="off" />
+                <button type="submit">남기기</button>
+              </form>
+            </div>
+          </div>
         </div>
       </div>
-      <div class="song-body">
-        <div class="sessions">${rows || '<p class="count">세션 정원이 아직 없어요 — 수정 버튼으로 채워주세요</p>'}</div>
-        <div class="comments">
-          ${comments}
-          <form class="comment-form" data-act="comment">
-            <input type="text" maxlength="200" placeholder="하고 싶은 말" autocomplete="off" />
-            <button type="submit">남기기</button>
-          </form>
-        </div>
-      </div>
-      <p class="song-foot">제안 ${esc(song.createdBy)}</p>
     </article>`;
 }
 
+function matchesFilter(song) {
+  const remain = remainInfo(song);
+  if (filter === 'open' && !(remain.cls === 'some' || remain.cls === 'many')) return false;
+  if (filter === 'full' && remain.cls !== 'full') return false;
+  if (filter === 'mine' && !SESSIONS.some((s) => song.members[s].includes(me))) return false;
+  if (query) {
+    const haystack =
+      `${song.title} ${song.artist} ${SESSIONS.flatMap((s) => song.members[s]).join(' ')}`.toLowerCase();
+    if (!haystack.includes(query)) return false;
+  }
+  return true;
+}
+
+function filterCounts() {
+  const counts = { all: songs.length, open: 0, full: 0, mine: 0 };
+  for (const s of songs) {
+    const cls = remainInfo(s).cls;
+    if (cls === 'some' || cls === 'many') counts.open++;
+    if (cls === 'full') counts.full++;
+    if (SESSIONS.some((sess) => s.members[sess].includes(me))) counts.mine++;
+  }
+  document.querySelectorAll('.filter').forEach((b) => {
+    $('.cnt', b).textContent = counts[b.dataset.filter];
+  });
+}
+
 function render() {
-  $('#song-count').textContent = songs.length ? `— ${songs.length}곡` : '';
-  $('#songs').innerHTML = songs.length
-    ? songs.map(songCard).join('')
-    : '<div class="empty">아직 곡이 없어요. 첫 곡을 올려주세요!</div>';
+  const visible = songs.map((s, i) => ({ s, i })).filter(({ s }) => matchesFilter(s));
+  filterCounts();
+  $('#song-count').textContent = !songs.length
+    ? ''
+    : visible.length === songs.length
+      ? `— ${songs.length}곡`
+      : `— ${visible.length}/${songs.length}곡`;
+  $('#songs').innerHTML = !songs.length
+    ? '<div class="empty">아직 곡이 없어요. 첫 곡을 올려주세요!</div>'
+    : visible.length
+      ? visible.map(({ s, i }) => songCard(s, i)).join('')
+      : '<div class="empty">조건에 맞는 곡이 없어요<br /><button type="button" class="ghost" id="clear-filter">필터 초기화</button></div>';
 }
 
 // 단일 카드만 교체 — 스크롤·다른 카드의 입력 상태 유지
@@ -353,6 +441,16 @@ async function poll() {
 
 /* ── 카드 내 액션 (이벤트 위임) ── */
 $('#songs').addEventListener('click', async (e) => {
+  if (e.target.closest('#clear-filter')) {
+    filter = 'all';
+    query = '';
+    $('#search').value = '';
+    document.querySelectorAll('.filter').forEach((b) =>
+      b.classList.toggle('on', b.dataset.filter === 'all'),
+    );
+    render();
+    return;
+  }
   const btn = e.target.closest('button[data-act]');
   if (!btn) return;
   const card = btn.closest('.song');
@@ -360,6 +458,12 @@ $('#songs').addEventListener('click', async (e) => {
   const song = songs.find((s) => s.id === id);
   try {
     switch (btn.dataset.act) {
+      case 'toggle': {
+        if (expanded.has(id)) expanded.delete(id);
+        else expanded.add(id);
+        card.outerHTML = songCard(song, songs.findIndex((s) => s.id === id));
+        return;
+      }
       case 'join':
         updateCard(
           await api(`/api/songs/${id}/members`, 'POST', {

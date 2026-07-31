@@ -68,9 +68,14 @@
   </header>
 
   <main>
-    <!-- 곡 적기 -->
+    <!-- 곡 적기 (접힘 기본) -->
     <section class="composer" id="composer">
-      <h2 class="section-title">곡 적기</h2>
+      <button type="button" id="composer-toggle" aria-expanded="false">
+        <span class="section-title">곡 적기</span>
+        <svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>
+      </button>
+      <div class="composer-body" id="composer-body">
+      <div class="acc-clip">
       <form id="song-form">
         <div class="link-row">
           <input id="f-link" type="url" placeholder="곡 링크 (YouTube · Spotify · SoundCloud)" autocomplete="off" />
@@ -84,11 +89,22 @@
         <div class="slot-row" id="f-slots"></div>
         <button type="submit" class="submit">세트리스트에 올리기</button>
       </form>
+      </div>
+      </div>
     </section>
 
     <!-- 곡 리스트 -->
     <section>
       <h2 class="section-title">곡 리스트 <span id="song-count"></span></h2>
+      <div class="list-toolbar">
+        <div class="filters" id="filters">
+          <button type="button" class="filter on" data-filter="all">전체 <span class="cnt"></span></button>
+          <button type="button" class="filter" data-filter="open">모집 중 <span class="cnt"></span></button>
+          <button type="button" class="filter" data-filter="full">모집 완료 <span class="cnt"></span></button>
+          <button type="button" class="filter" data-filter="mine">내 곡 <span class="cnt"></span></button>
+        </div>
+        <input id="search" type="search" placeholder="곡 · 뮤지션 · 멤버 검색" autocomplete="off" />
+      </div>
       <div id="songs"></div>
     </section>
   </main>
