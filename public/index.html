@@ -7,7 +7,7 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🎸</text></svg>" />
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-  <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet" />
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
@@ -18,14 +18,24 @@
       <p class="gate-kicker">ONL ENSEMBLE</p>
       <h1 class="gate-title">오늘 밤,<br />무대에 설 이름은?</h1>
 
-      <!-- 1단계: 인증코드 -->
+      <!-- 1단계: 인증코드 — 백스테이지 패스 티켓 -->
       <div id="gate-auth">
-        <p class="gate-or">합주 멤버 인증코드를 입력하세요</p>
-        <form id="auth-form">
-          <input id="auth-code" type="text" maxlength="20" placeholder="인증코드" autocomplete="off" autocapitalize="off" />
-          <button type="submit">확인</button>
-        </form>
-        <p id="auth-msg" class="parse-msg err" hidden></p>
+        <div class="ticket" id="ticket">
+          <div class="ticket-body">
+            <p class="ticket-kicker">Backstage Pass</p>
+            <p class="ticket-hint">합주 멤버 인증코드 · <strong>#yb 공지에서 확인</strong></p>
+            <form id="auth-form">
+              <input id="auth-code" type="text" maxlength="20" placeholder="CODE" autocomplete="off" autocapitalize="off" spellcheck="false" />
+              <button type="submit">입장 확인</button>
+            </form>
+            <p id="auth-msg" class="ticket-err" hidden></p>
+          </div>
+          <div class="ticket-rip" aria-hidden="true"></div>
+          <div class="ticket-stub" aria-hidden="true">
+            <span class="stub-text">ADMIT ONE · ONL ENSEMBLE</span>
+            <span class="barcode"></span>
+          </div>
+        </div>
       </div>
 
       <!-- 2단계: 프로필 선택 -->

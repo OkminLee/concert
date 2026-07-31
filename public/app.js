@@ -80,6 +80,10 @@ $('#auth-form').addEventListener('submit', async (e) => {
   } catch (err) {
     msg.textContent = err.message;
     msg.hidden = false;
+    const ticket = $('#ticket');
+    ticket.classList.remove('shake');
+    void ticket.offsetWidth; // reflow로 애니메이션 재시작
+    ticket.classList.add('shake');
   }
 });
 // Slack #yb 프로필로 입장 — 선택은 localStorage에 저장되어 다음 입장부터 생략

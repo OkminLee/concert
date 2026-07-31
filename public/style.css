@@ -96,8 +96,7 @@ body > * { position: relative; z-index: 2; }
 }
 .gate-or { font-size: 12px; color: var(--ink-dim); margin-bottom: 10px; }
 
-#gate-form, #auth-form { display: flex; gap: 10px; }
-#auth-form input,
+#gate-form { display: flex; gap: 10px; }
 #gate-form input {
   flex: 1;
   background: #1c1815;
@@ -108,9 +107,7 @@ body > * { position: relative; z-index: 2; }
   padding: 14px 18px;
   text-align: center;
 }
-#auth-form input:focus,
 #gate-form input:focus { outline: 2px solid var(--amber); border-color: transparent; }
-#auth-form button,
 #gate-form button {
   background: var(--amber);
   color: #221503;
@@ -119,9 +116,122 @@ body > * { position: relative; z-index: 2; }
   padding: 0 22px;
   cursor: pointer;
 }
-#auth-form button:hover,
 #gate-form button:hover { background: #ffc476; }
-#auth-msg { margin-top: 10px; text-align: center; }
+
+/* ── 백스테이지 패스 티켓 (인증코드) ── */
+.ticket {
+  --paper: #f0e9dc;
+  --paper-ink: #2a2118;
+  background: var(--paper);
+  border-radius: 18px;
+  color: var(--paper-ink);
+  text-align: left;
+  overflow: hidden;
+  transform: rotate(-1.2deg);
+  box-shadow: 0 22px 55px rgba(0, 0, 0, 0.55), 0 0 70px rgba(255, 180, 84, 0.14);
+}
+.ticket-body { padding: 24px 24px 18px; }
+.ticket-kicker {
+  font-family: var(--display);
+  font-size: 21px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #b3540a;
+  margin-bottom: 3px;
+}
+.ticket-hint { font-size: 12.5px; color: #8d8272; margin-bottom: 15px; }
+.ticket-hint strong { color: var(--paper-ink); }
+#auth-form { display: grid; gap: 10px; }
+#auth-code {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 21px;
+  font-weight: 600;
+  letter-spacing: 0.32em;
+  text-align: center;
+  background: #fffdf8;
+  border: 2px dashed #d8cbb6;
+  border-radius: 12px;
+  color: var(--paper-ink);
+  padding: 12px 10px;
+  padding-left: calc(10px + 0.32em);
+  width: 100%;
+}
+#auth-code::placeholder { color: #cfc2ab; }
+#auth-code:focus {
+  outline: none;
+  border-style: solid;
+  border-color: var(--amber-deep);
+  box-shadow: 0 0 0 3px rgba(224, 138, 30, 0.22);
+}
+#auth-form button {
+  background: var(--paper-ink);
+  color: var(--amber);
+  border: 0;
+  border-radius: 12px;
+  font: 700 15px var(--body);
+  padding: 12px;
+  cursor: pointer;
+}
+#auth-form button:hover { background: #3c2f20; }
+.ticket-err {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #c0392b;
+  margin-top: 10px;
+}
+/* 절취선 + 양쪽 노치 */
+.ticket-rip {
+  position: relative;
+  height: 0;
+  border-top: 2px dashed #cfc2ad;
+  margin: 0 16px;
+}
+.ticket-rip::before,
+.ticket-rip::after {
+  content: '';
+  position: absolute;
+  top: -12px;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: #0d0b0a;
+}
+.ticket-rip::before { left: -28px; }
+.ticket-rip::after { right: -28px; }
+.ticket-stub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 24px 16px;
+}
+.stub-text {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.16em;
+  color: #8d8272;
+  white-space: nowrap;
+}
+.barcode {
+  flex: 0 0 92px;
+  height: 26px;
+  opacity: 0.85;
+  background: repeating-linear-gradient(
+    90deg,
+    var(--paper-ink) 0 2px, transparent 2px 4px,
+    var(--paper-ink) 4px 5px, transparent 5px 8px,
+    var(--paper-ink) 8px 11px, transparent 11px 13px
+  );
+}
+@keyframes ticket-shake {
+  0%, 100% { transform: rotate(-1.2deg) translateX(0); }
+  20% { transform: rotate(-1.2deg) translateX(-7px); }
+  40% { transform: rotate(-1.2deg) translateX(6px); }
+  60% { transform: rotate(-1.2deg) translateX(-4px); }
+  80% { transform: rotate(-1.2deg) translateX(3px); }
+}
+.ticket.shake { animation: ticket-shake 0.45s ease; }
 
 /* ── 헤더 ── */
 .top {
