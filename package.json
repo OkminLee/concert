@@ -1,0 +1,13 @@
+{
+  "name": "concert",
+  "version": "1.0.0",
+  "description": "합주곡 세트리스트 관리 시스템",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.22.2"
+  }
+}
