@@ -54,16 +54,9 @@ body > * { position: relative; z-index: 2; }
 .gate.hidden { display: none; }
 .gate-inner { width: 100%; max-width: 420px; text-align: center; }
 .gate-kicker {
-  font-size: 13px; letter-spacing: 0.42em; color: var(--amber);
-  margin-bottom: 18px;
-}
-.gate-title {
-  font-family: var(--display);
-  font-weight: 400;
-  font-size: clamp(38px, 9vw, 54px);
-  line-height: 1.15;
-  margin-bottom: 36px;
-  text-shadow: 0 0 44px rgba(255, 180, 84, 0.35);
+  font-size: 14px; letter-spacing: 0.42em; color: var(--amber);
+  margin-bottom: 30px;
+  text-shadow: 0 0 30px rgba(255, 180, 84, 0.45);
 }
 /* Slack 프로필 선택 */
 .gate-profiles {
