@@ -28,6 +28,7 @@ const ICONS = {
   trash: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4a1 1 0 0 1 1-1h6a1 1 0 0 1 1 1v2m3 0v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>',
   mic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4"/></svg>',
   caret: '<svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
+  comment: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-8 8H4l2.5-2.7A8 8 0 1 1 21 12Z"/></svg>',
 };
 
 const expanded = new Set(); // 펼쳐진 곡 id — 재렌더에도 유지
@@ -41,22 +42,28 @@ const esc = (s) =>
 
 let accessCode = localStorage.getItem('accesscode') || '';
 
+// 인증 해제 — 401 복귀와 수동 초기화가 같은 경로를 쓴다
+function clearAuth() {
+  accessCode = '';
+  localStorage.removeItem('accesscode');
+  $('#auth-code').value = '';
+  $('#auth-msg').hidden = true;
+  // 모달이 top layer에 떠 있으면 게이트가 inert로 가려진다 → 먼저 닫기
+  document.querySelectorAll('dialog[open]').forEach((d) => d.close());
+  syncGate();
+}
+
 async function api(path, method = 'GET', body) {
   const headers = {};
   if (body) headers['Content-Type'] = 'application/json';
-  if (accessCode) headers['x-access-code'] = accessCode;
+  if (accessCode) headers['x-access-code'] = encodeURIComponent(accessCode); // 비ASCII 코드도 헤더 안전
   const res = await fetch(path, {
     method,
     headers,
     body: body ? JSON.stringify(body) : undefined,
   });
   const data = await res.json().catch(() => ({}));
-  if (res.status === 401 && path !== '/api/auth') {
-    // 코드가 틀렸거나 서버에서 바뀜 → 인증 단계로 복귀
-    accessCode = '';
-    localStorage.removeItem('accesscode');
-    syncGate();
-  }
+  if (res.status === 401 && path !== '/api/auth') clearAuth();
   if (!res.ok) throw new Error(data.error || `요청 실패 (${res.status})`);
   return data;
 }
@@ -110,6 +117,7 @@ function login(name) {
   me = name;
   localStorage.setItem('nickname', me);
   syncGate();
+  render(); // 내 곡 카운트·칩 하이라이트·참가 버튼 등 me 의존 UI 갱신
 }
 $('#gate-profiles').addEventListener('click', (e) => {
   const btn = e.target.closest('.profile');
@@ -125,15 +133,10 @@ $('#btn-me').addEventListener('click', () => {
   me = '';
   $('#gate-name').value = '';
   syncGate();
+  render();
 });
 // 인증 정보 초기화 — 저장된 인증코드를 지우고 티켓 단계로 복귀
-$('#btn-reset-auth').addEventListener('click', () => {
-  accessCode = '';
-  localStorage.removeItem('accesscode');
-  $('#auth-code').value = '';
-  $('#auth-msg').hidden = true;
-  syncGate();
-});
+$('#btn-reset-auth').addEventListener('click', clearAuth);
 
 /* ── 세션 정원 스테퍼 ── */
 function renderSteppers(container, slots) {
@@ -213,6 +216,9 @@ $('#song-form').addEventListener('submit', async (e) => {
     renderSteppers($('#f-slots'), { ...DEFAULT_SLOTS });
     setComposer(false);
     expanded.add(song.id); // 방금 올린 곡은 펼쳐서 보여준다
+    filter = 'all'; // 활성 필터·검색이 새 곡을 숨기지 않도록 초기화
+    query = '';
+    $('#search').value = '';
     await load();
   } catch (err) {
     alert(err.message);
@@ -220,6 +226,7 @@ $('#song-form').addEventListener('submit', async (e) => {
 });
 
 /* ── 곡 적기 접기/펼치기 ── */
+$('#composer-toggle').insertAdjacentHTML('beforeend', ICONS.caret); // 캐럿 아이콘은 ICONS 단일 정의
 function setComposer(open) {
   $('#composer').classList.toggle('open', open);
   $('#composer-toggle').setAttribute('aria-expanded', open);
@@ -234,8 +241,7 @@ $('#composer-toggle').addEventListener('click', () => {
 $('#filters').addEventListener('click', (e) => {
   const btn = e.target.closest('.filter');
   if (!btn) return;
-  filter = btn.dataset.filter;
-  document.querySelectorAll('.filter').forEach((b) => b.classList.toggle('on', b === btn));
+  filter = btn.dataset.filter; // 활성 표시는 render → filterCounts가 파생
   render();
 });
 $('#search').addEventListener('input', (e) => {
@@ -254,14 +260,32 @@ function remainInfo(song) {
   return { cls: 'many', text: `${remain}명 남음` };
 }
 
+// 세션 충원 상태 — 행 요약(minis)과 펼침 세션 행이 같은 규칙을 공유한다
+const activeSessions = (song) =>
+  SESSIONS.filter((s) => song.slots[s] > 0 || song.members[s].length > 0);
+function sessionStat(song, s) {
+  const cap = song.slots[s];
+  const cnt = song.members[s].length;
+  return { cap, cnt, cls: cnt > cap ? 'over' : cnt === cap && cap > 0 ? 'filled' : '' };
+}
+
+// 필터 분류 — 목록 필터링과 칩 카운트가 같은 술어를 공유한다
+function inCategory(song, name) {
+  if (name === 'open') {
+    const cls = remainInfo(song).cls;
+    return cls === 'some' || cls === 'many';
+  }
+  if (name === 'full') return remainInfo(song).cls === 'full';
+  if (name === 'mine') return SESSIONS.some((s) => song.members[s].includes(me));
+  return true;
+}
+
 function songCard(song, idx) {
   const remain = remainInfo(song);
-  const rows = SESSIONS.filter((s) => song.slots[s] > 0 || song.members[s].length > 0)
+  const rows = activeSessions(song)
     .map((s) => {
       const m = SESSION_META[s];
-      const cap = song.slots[s];
-      const cnt = song.members[s].length;
-      const countCls = cnt > cap ? 'over' : cnt === cap && cap > 0 ? 'filled' : '';
+      const { cap, cnt, cls: countCls } = sessionStat(song, s);
       const chips = song.members[s]
         .map(
           (name) => `
@@ -314,17 +338,15 @@ function songCard(song, idx) {
 
   const open = expanded.has(song.id);
   // 접힌 행의 세션 요약: 세션색 점 + 충원 현황 (모바일에선 점만)
-  const minis = SESSIONS.filter((s) => song.slots[s] > 0 || song.members[s].length > 0)
+  const minis = activeSessions(song)
     .map((s) => {
-      const cap = song.slots[s];
-      const cnt = song.members[s].length;
-      const cls = cnt > cap ? 'over' : cnt === cap && cap > 0 ? 'filled' : '';
+      const { cap, cnt, cls } = sessionStat(song, s);
       const label = `${SESSION_META[s].label} ${cnt}/${cap}`;
-      return `<span class="mini ${cls}" title="${label}" aria-label="${label}"><i class="dot ${s}"></i><span class="mini-num ${cls}">${cnt}/${cap}</span></span>`;
+      return `<span class="mini ${cls}" title="${label}" aria-label="${label}"><i class="dot ${s}"></i><span class="mini-num">${cnt}/${cap}</span></span>`;
     })
     .join('');
   const cmt = song.comments.length
-    ? `<span class="mini cmt" title="코멘트 ${song.comments.length}개"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-8 8H4l2.5-2.7A8 8 0 1 1 21 12Z"/></svg><span class="mini-num">${song.comments.length}</span></span>`
+    ? `<span class="mini cmt" title="코멘트 ${song.comments.length}개">${ICONS.comment}<span class="mini-num">${song.comments.length}</span></span>`
     : '';
 
   return `
@@ -366,10 +388,7 @@ function songCard(song, idx) {
 }
 
 function matchesFilter(song) {
-  const remain = remainInfo(song);
-  if (filter === 'open' && !(remain.cls === 'some' || remain.cls === 'many')) return false;
-  if (filter === 'full' && remain.cls !== 'full') return false;
-  if (filter === 'mine' && !SESSIONS.some((s) => song.members[s].includes(me))) return false;
+  if (!inCategory(song, filter)) return false;
   if (query) {
     const haystack =
       `${song.title} ${song.artist} ${SESSIONS.flatMap((s) => song.members[s]).join(' ')}`.toLowerCase();
@@ -378,17 +397,14 @@ function matchesFilter(song) {
   return true;
 }
 
+// 칩 카운트와 활성 표시는 렌더마다 filter 상태에서 파생
 function filterCounts() {
-  const counts = { all: songs.length, open: 0, full: 0, mine: 0 };
-  for (const s of songs) {
-    const cls = remainInfo(s).cls;
-    if (cls === 'some' || cls === 'many') counts.open++;
-    if (cls === 'full') counts.full++;
-    if (SESSIONS.some((sess) => s.members[sess].includes(me))) counts.mine++;
-  }
-  document.querySelectorAll('.filter').forEach((b) => {
-    $('.cnt', b).textContent = counts[b.dataset.filter];
-  });
+  $('#filters')
+    .querySelectorAll('.filter')
+    .forEach((b) => {
+      $('.cnt', b).textContent = songs.filter((s) => inCategory(s, b.dataset.filter)).length;
+      b.classList.toggle('on', b.dataset.filter === filter);
+    });
 }
 
 // keyed diff 렌더 — 바뀐 카드만 DOM 교체 (이미지 재로드·애니메이션 재생 방지)
@@ -396,6 +412,7 @@ const cardCache = new Map(); // song.id -> 마지막 렌더 HTML
 
 function render() {
   const container = $('#songs');
+  for (const id of [...expanded]) if (!songs.some((s) => s.id === id)) expanded.delete(id);
   const visible = songs.map((s, i) => ({ s, i })).filter(({ s }) => matchesFilter(s));
   filterCounts();
   $('#song-count').textContent = !songs.length
@@ -486,9 +503,6 @@ $('#songs').addEventListener('click', async (e) => {
     filter = 'all';
     query = '';
     $('#search').value = '';
-    document.querySelectorAll('.filter').forEach((b) =>
-      b.classList.toggle('on', b.dataset.filter === 'all'),
-    );
     render();
     return;
   }
@@ -552,6 +566,7 @@ $('#songs').addEventListener('click', async (e) => {
         return;
     }
   } catch (err) {
+    if (!accessCode) return; // 401로 게이트 복귀 중 — 알림·재요청 생략
     alert(err.message);
     await load();
   }
@@ -567,6 +582,7 @@ $('#songs').addEventListener('submit', async (e) => {
   try {
     updateCard(await api(`/api/songs/${id}/comments`, 'POST', { author: me, text: input.value }));
   } catch (err) {
+    if (!accessCode) return;
     alert(err.message);
   }
 });

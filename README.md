@@ -4,7 +4,7 @@
 
 ## 기능
 
-- **인증코드 게이트** — 입장 전 밴드 공용 인증코드 입력 (기본 `yb2026`, `ACCESS_CODE` env로 변경). 모든 API도 코드 헤더 없으면 401. 기기당 1회 입력 후 저장
+- **인증코드 게이트** — 입장 전 밴드 공용 인증코드 입력 (`ACCESS_CODE` env로 설정 — **운영 시 반드시 기본값에서 변경**). 모든 API도 코드 헤더 없으면 401, `/api/auth`는 IP당 분당 10회 제한. 기기당 1회 입력 후 저장
 - **프로필 로그인** — Slack #yb 멤버 프로필(아바타)을 골라 입장, 선택은 저장되어 재입장 시 생략. 목록에 없으면 닉네임 직접 입력
 - **곡 추가**
   - 자동: YouTube · Spotify · SoundCloud 링크 붙여넣기 → `자동 인식` → 뮤지션/곡명 자동 분해 (oEmbed 기반)
@@ -32,8 +32,8 @@ npm start          # http://localhost:3000
 현재 **https://concert.okm.studio** — 로컬 서버를 Cloudflare named tunnel(`concert`)로 노출한다.
 
 ```bash
-npm start                          # 서버 (localhost:3000)
-cloudflared tunnel run concert     # 고정 도메인 터널 (~/.cloudflared/config.yml)
+ACCESS_CODE=<밴드 공용 코드> npm start   # 서버 (localhost:3000)
+cloudflared tunnel run concert           # 고정 도메인 터널 (~/.cloudflared/config.yml)
 ```
 
 둘 다 이 Mac에서 떠 있어야 접속된다. 재시작해도 URL은 유지된다.
@@ -44,6 +44,8 @@ cloudflared tunnel run concert     # 고정 도메인 터널 (~/.cloudflared/con
 - Vercel/Netlify 같은 serverless는 파일 저장이 유지되지 않아 부적합 (쓰려면 저장소를 DB로 교체 필요)
 
 ## API
+
+`POST /api/auth {code}`로 코드를 검증하고, 이후 모든 요청에 `x-access-code: <URI 인코딩된 코드>` 헤더가 필요하다 (없으면 401).
 
 | Method | Path | 설명 |
 |---|---|---|

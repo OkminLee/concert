@@ -24,21 +24,53 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ---- 입장 인증코드: 밴드 공용 코드 1개, 기기당 1회 입력 ----
-const ACCESS_CODE = process.env.ACCESS_CODE || 'yb2026';
+const ACCESS_CODE = (process.env.ACCESS_CODE || 'yb2026').trim();
 
+function codeMatches(input) {
+  if (typeof input !== 'string') return false;
+  const a = Buffer.from(input.trim());
+  const b = Buffer.from(ACCESS_CODE);
+  return a.length === b.length && crypto.timingSafeEqual(a, b);
+}
+
+// 무차별 대입 방지: IP당 분당 10회 (터널 뒤에서는 CF-Connecting-IP가 실제 클라이언트)
+const authAttempts = new Map();
 app.post('/api/auth', (req, res) => {
-  const { code } = req.body || {};
-  if (typeof code !== 'string' || code.trim() !== ACCESS_CODE)
+  const ip = req.get('cf-connecting-ip') || req.ip;
+  const now = Date.now();
+  const rec = authAttempts.get(ip) || { count: 0, resetAt: now + 60_000 };
+  if (now > rec.resetAt) {
+    rec.count = 0;
+    rec.resetAt = now + 60_000;
+  }
+  rec.count += 1;
+  authAttempts.set(ip, rec);
+  if (rec.count > 10)
+    return res.status(429).json({ error: '시도가 너무 많아요. 1분 뒤 다시 해주세요' });
+  if (!codeMatches(req.body?.code))
     return res.status(401).json({ error: '인증코드가 맞지 않아요' });
+  authAttempts.delete(ip);
   res.json({ ok: true });
 });
 
-// /api/auth 를 제외한 모든 API는 코드 헤더 필수
+// /api/auth 를 제외한 모든 API는 코드 헤더 필수 (클라이언트는 URI 인코딩해 전송)
 app.use('/api', (req, res, next) => {
   if (req.path === '/auth') return next();
-  if (req.get('x-access-code') === ACCESS_CODE) return next();
+  let header = req.get('x-access-code') || '';
+  try {
+    header = decodeURIComponent(header);
+  } catch {
+    // 인코딩 깨진 헤더는 그대로 비교 → 아래에서 401
+  }
+  if (codeMatches(header)) return next();
   res.status(401).json({ error: '인증이 필요해요' });
 });
+
+// 곡 링크는 http(s)만 저장 — javascript: 등 스킴 차단
+function cleanLink(link) {
+  const l = (link || '').trim();
+  return /^https?:\/\//i.test(l) ? l : '';
+}
 
 function findSong(req, res) {
   const song = db.songs.find((s) => s.id === req.params.id);
@@ -69,7 +101,7 @@ app.post('/api/songs', (req, res) => {
     id: crypto.randomUUID(),
     title: title.trim(),
     artist: (artist || '').trim(),
-    link: (link || '').trim(),
+    link: cleanLink(link),
     slots: cleanSlots(slots),
     members: Object.fromEntries(SESSIONS.map((s) => [s, []])),
     comments: [],
@@ -91,7 +123,7 @@ app.patch('/api/songs/:id', (req, res) => {
     song.title = title.trim();
   }
   if (artist !== undefined) song.artist = artist.trim();
-  if (link !== undefined) song.link = link.trim();
+  if (link !== undefined) song.link = cleanLink(link);
   if (slots !== undefined) song.slots = cleanSlots(slots);
   save();
   res.json(song);
