@@ -175,6 +175,9 @@ function bindStepper(container) {
 renderSteppers($('#f-slots'), { ...DEFAULT_SLOTS });
 bindStepper($('#f-slots'));
 
+// 링크 붙여넣기만 해도 자동 인식 실행
+$('#f-link').addEventListener('paste', () => setTimeout(() => $('#btn-parse').click(), 60));
+
 $('#btn-parse').addEventListener('click', async () => {
   const url = $('#f-link').value.trim();
   const msg = $('#parse-msg');
@@ -268,6 +271,16 @@ function sessionStat(song, s) {
   const cnt = song.members[s].length;
   return { cap, cnt, cls: cnt > cap ? 'over' : cnt === cap && cap > 0 ? 'filled' : '' };
 }
+
+// 유튜브 링크면 카드 안에서 바로 재생할 수 있게 임베드
+function youtubeId(url) {
+  const m = (url || '').match(
+    /(?:youtube\.com\/(?:watch\?(?:.*&)?v=|shorts\/|embed\/)|youtu\.be\/)([\w-]{6,})/,
+  );
+  return m ? m[1] : null;
+}
+const playerHTML = (videoId) =>
+  `<iframe src="https://www.youtube-nocookie.com/embed/${videoId}" title="YouTube 플레이어" allow="encrypted-media; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe>`;
 
 // 필터 분류 — 목록 필터링과 칩 카운트가 같은 술어를 공유한다
 function inCategory(song, name) {
@@ -372,6 +385,11 @@ function songCard(song, idx) {
               <button type="button" class="icon-btn" data-act="delete" title="삭제">${ICONS.trash}</button>
             </span>
           </div>
+          ${(() => {
+            const vid = youtubeId(song.link);
+            // 접힘 상태에선 iframe을 비워 재생·로드 방지, 펼칠 때 toggle에서 주입
+            return vid ? `<div class="player" data-video="${vid}">${open ? playerHTML(vid) : ''}</div>` : '';
+          })()}
           <div class="song-body">
             <div class="sessions">${rows || '<p class="count">세션 정원이 아직 없어요 — 수정 버튼으로 채워주세요</p>'}</div>
             <div class="comments">
@@ -520,6 +538,8 @@ $('#songs').addEventListener('click', async (e) => {
         else expanded.delete(id);
         card.classList.toggle('open', willOpen);
         btn.setAttribute('aria-expanded', willOpen);
+        const player = card.querySelector('.player');
+        if (player) player.innerHTML = willOpen ? playerHTML(player.dataset.video) : ''; // 접으면 재생 중지
         cardCache.set(id, songCard(song, songs.findIndex((s) => s.id === id)));
         return;
       }

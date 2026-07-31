@@ -542,6 +542,19 @@ input:focus { outline: 2px solid var(--amber); border-color: transparent; }
 #songs.intro .song:nth-child(7) { animation-delay: 150ms; }
 #songs.intro .song:nth-child(8) { animation-delay: 175ms; }
 
+/* 유튜브 인라인 플레이어 */
+.player { margin: 10px 16px 0; }
+.player:empty { display: none; }
+.player iframe {
+  display: block;
+  width: 100%;
+  max-width: 480px;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: 10px;
+  background: #000;
+}
+
 /* 펼침 패널 */
 .detail-top {
   display: flex;
