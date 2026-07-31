@@ -119,6 +119,14 @@ $('#btn-me').addEventListener('click', () => {
   $('#gate-name').value = '';
   syncGate();
 });
+// 인증 정보 초기화 — 저장된 인증코드를 지우고 티켓 단계로 복귀
+$('#btn-reset-auth').addEventListener('click', () => {
+  accessCode = '';
+  localStorage.removeItem('accesscode');
+  $('#auth-code').value = '';
+  $('#auth-msg').hidden = true;
+  syncGate();
+});
 
 /* ── 세션 정원 스테퍼 ── */
 function renderSteppers(container, slots) {

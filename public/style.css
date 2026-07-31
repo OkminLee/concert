@@ -95,6 +95,17 @@ body > * { position: relative; z-index: 2; }
   background: var(--bg-raised);
 }
 .gate-or { font-size: 12px; color: var(--ink-dim); margin-bottom: 10px; }
+.gate-reset {
+  background: transparent;
+  border: 0;
+  color: var(--ink-dim);
+  font: 500 12.5px var(--body);
+  margin-top: 16px;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.gate-reset:hover { color: var(--amber); }
 
 #gate-form { display: flex; gap: 10px; }
 #gate-form input {
