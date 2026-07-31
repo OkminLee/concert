@@ -579,17 +579,8 @@ input:focus { outline: 2px solid var(--amber); border-color: transparent; }
 .badge-remain.many { background: rgba(255, 92, 77, 0.15); color: var(--danger); }
 .badge-remain.none { background: rgba(155, 145, 132, 0.13); color: var(--ink-dim); }
 
-/* 카드 본문: 모바일 1단, 데스크톱은 세션|코멘트 2단 */
-.song-body { display: grid; gap: 0; }
-@media (min-width: 720px) {
-  .song-body { grid-template-columns: 1.4fr 1fr; gap: 16px; }
-  .song-body .comments {
-    border-top: 0;
-    border-left: 1px dashed var(--line);
-    margin-top: 12px;
-    padding: 0 0 0 16px;
-  }
-}
+/* 카드 본문: 세션 아래에 코멘트 (전 뷰포트 1단) */
+.song-body { display: block; }
 
 /* 세션 줄 */
 .sessions { margin-top: 12px; display: grid; gap: 7px; align-content: start; }
@@ -641,14 +632,24 @@ input:focus { outline: 2px solid var(--amber); border-color: transparent; }
 
 /* 코멘트 */
 .comments { margin-top: 14px; border-top: 1px dashed var(--line); padding-top: 10px; }
+/* 코멘트: 1줄 = 작성자·본문·삭제 / 2줄 = 리액션 (팔레트가 본문을 밀지 않게 분리) */
 .comment {
   font-size: 13.5px;
-  display: flex; gap: 7px; align-items: baseline;
-  padding: 2px 0;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 5px;
+  padding: 4px 0;
 }
-.comment .author { color: var(--amber); font-weight: 700; white-space: nowrap; display: inline-flex; align-items: center; gap: 5px; }
-.comment .text { flex: 1; overflow-wrap: anywhere; }
-.comment .icon-btn { font-size: 11px; padding: 1px 4px; }
+.comment .author {
+  grid-row: 1; grid-column: 1;
+  color: var(--amber); font-weight: 700; white-space: nowrap;
+  display: inline-flex; align-items: center; gap: 5px;
+}
+.comment .text { grid-row: 1; grid-column: 2; overflow-wrap: anywhere; line-height: 1.45; }
+.comment > .icon-btn { grid-row: 1; grid-column: 3; font-size: 11px; padding: 1px 4px; }
+.comment .reacts { grid-row: 2; grid-column: 2 / 4; }
 
 /* 코멘트 리액션 */
 .reacts { display: inline-flex; align-items: center; gap: 4px; flex-wrap: wrap; }
