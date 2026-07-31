@@ -29,13 +29,19 @@ npm start          # http://localhost:3000
 
 ## Public 배포
 
-Node 서버 + 파일 저장소 구조라 **퍼시스턴트 디스크가 있는 호스팅**이 필요하다:
+현재 **https://concert.okm.studio** — 로컬 서버를 Cloudflare named tunnel(`concert`)로 노출한다.
+
+```bash
+npm start                          # 서버 (localhost:3000)
+cloudflared tunnel run concert     # 고정 도메인 터널 (~/.cloudflared/config.yml)
+```
+
+둘 다 이 Mac에서 떠 있어야 접속된다. 재시작해도 URL은 유지된다.
+
+상시 클라우드 운영으로 옮길 때는 Node 서버 + 파일 저장소 구조라 **퍼시스턴트 디스크가 있는 호스팅**이 필요하다:
 
 - **Railway / Render / Fly.io** — repo 연결 후 `npm start`, 볼륨 1개 마운트해서 `data.json` 유지
-- 같은 네트워크 공유만 필요하면: `PORT=3000 npm start` 후 로컬 IP 공유
-- 임시 외부 공개: `npx localtunnel --port 3000` 또는 `cloudflared tunnel --url http://localhost:3000`
-
-Vercel/Netlify 같은 serverless는 파일 저장이 유지되지 않아 부적합 (쓰려면 저장소를 DB로 교체 필요).
+- Vercel/Netlify 같은 serverless는 파일 저장이 유지되지 않아 부적합 (쓰려면 저장소를 DB로 교체 필요)
 
 ## API
 
