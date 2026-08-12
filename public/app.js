@@ -272,6 +272,46 @@ function sessionStat(song, s) {
   return { cap, cnt, cls: cnt > cap ? 'over' : cnt === cap && cap > 0 ? 'filled' : '' };
 }
 
+/* ── 무대 포지션 렌더 ── */
+// 자리 1개 — 빈 자리는 join, 채워진 자리는 leave (본인/타인 confirm은 기존 핸들러가 분기)
+function spotHTML(s, name, over) {
+  // 'empty'는 빈 목록 상태 박스(.empty)와 충돌 — 빈 자리는 free
+  if (name === undefined)
+    return `<button type="button" class="spot free ${over ? 'over' : ''}" data-act="join" data-session="${s}"
+      aria-label="${SESSION_META[s].label} ${over ? '정원 초과 지원' : '참가'}"${over ? ' title="정원보다 많아도 올라갈 수 있어요"' : ''}>+</button>`;
+  const ava =
+    avatarImg(name, 'spot-ava') || `<span class="spot-initial">${esc(name.slice(0, 1))}</span>`;
+  return `
+    <button type="button" class="spot filled ${name === me ? 'me' : ''} ${over ? 'over' : ''}"
+      data-act="leave" data-session="${s}" data-name="${esc(name)}"
+      title="${esc(name)}" aria-label="${esc(name)} 빼기">
+      ${ava}<span class="nm">${esc(name)}</span>
+    </button>`;
+}
+// 객석에서 본 무대 — 정원만큼 빈 자리를 깔고, 초과 인원은 over 자리로 이어붙인다
+function stageHTML(song) {
+  const act = activeSessions(song);
+  if (!act.length)
+    return '<p class="count">세션 정원이 아직 없어요 — 수정 버튼으로 채워주세요</p>';
+  const zones = act
+    .map((s) => {
+      const m = SESSION_META[s];
+      const { cap, cnt, cls } = sessionStat(song, s);
+      const spots = [];
+      for (let i = 0; i < Math.max(cap, cnt); i++)
+        spots.push(spotHTML(s, song.members[s][i], i >= cap));
+      // 기존 행 UI처럼 정원이 차도 초과 지원 가능 — 빈 자리가 없으면 초과 자리를 하나 연다 (내가 이미 있으면 생략)
+      if (cnt >= cap && !song.members[s].includes(me)) spots.push(spotHTML(s, undefined, true));
+      return `
+        <div class="zone ${s}">
+          <span class="zone-label"><i class="dot ${s}"></i>${m.label} <b class="${cls}">${cnt}/${cap}</b></span>
+          <div class="spots">${spots.join('')}</div>
+        </div>`;
+    })
+    .join('');
+  return `<div class="stage"><div class="stage-grid">${zones}</div><div class="stage-edge">AUDIENCE · 객석</div></div>`;
+}
+
 // 유튜브 링크면 카드 안에서 바로 재생할 수 있게 임베드
 function youtubeId(url) {
   const m = (url || '').match(
@@ -295,29 +335,6 @@ function inCategory(song, name) {
 
 function songCard(song, idx) {
   const remain = remainInfo(song);
-  const rows = activeSessions(song)
-    .map((s) => {
-      const m = SESSION_META[s];
-      const { cap, cnt, cls: countCls } = sessionStat(song, s);
-      const chips = song.members[s]
-        .map(
-          (name) => `
-            <span class="chip ${name === me ? 'me' : ''}">${avatarImg(name)}${esc(name)}
-              <button type="button" data-act="leave" data-session="${s}" data-name="${esc(name)}" aria-label="${esc(name)} 빼기">✕</button>
-            </span>`,
-        )
-        .join('');
-      const joined = song.members[s].includes(me);
-      return `
-        <div class="session-row">
-          <span class="tag ${s}" title="${m.label}">${m.tag}</span>
-          <span class="count ${countCls}">${cnt}/${cap}</span>
-          <div class="chips">${chips}
-            ${joined ? '' : `<button type="button" class="join" data-act="join" data-session="${s}">+ 하고싶어요</button>`}
-          </div>
-        </div>`;
-    })
-    .join('');
 
   const comments = song.comments
     .map((c) => {
@@ -391,7 +408,7 @@ function songCard(song, idx) {
             return vid ? `<div class="player" data-video="${vid}">${open ? playerHTML(vid) : ''}</div>` : '';
           })()}
           <div class="song-body">
-            <div class="sessions">${rows || '<p class="count">세션 정원이 아직 없어요 — 수정 버튼으로 채워주세요</p>'}</div>
+            <div class="sessions">${stageHTML(song)}</div>
             <div class="comments">
               ${comments}
               <form class="comment-form" data-act="comment">

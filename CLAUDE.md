@@ -42,6 +42,7 @@ curl -H 'x-access-code: <코드>' localhost:3000/api/songs
 
 - `render()`가 곡 id별 HTML 캐시(`cardCache`)와 비교해 **바뀐 카드만 DOM 교체**. 이미지 재로드·애니메이션 재생·입력 중 텍스트 소실을 막는 핵심 구조다. **`innerHTML` 통짜 재작성이나 카드 `outerHTML` 교체를 다시 들여오지 말 것** (깜빡임 회귀).
 - 행 펼침(`toggle`)은 재렌더 없이 클래스만 토글하고 `cardCache`를 갱신해 다음 diff와 동기화한다. 유튜브 플레이어 iframe은 펼칠 때 주입, 접을 때 제거(재생 중지).
+- 펼친 카드의 세션 신청은 무대 포지션 UI(`stageHTML`) — 빈 자리(`spot free`)가 join, 채워진 자리가 leave 버튼이고 기존 `data-act` 위임을 그대로 쓴다. 빈 자리에 `empty` 클래스 금지 — 빈 목록 상태 박스 `.empty` 규칙과 충돌한다.
 - 등장 애니메이션은 `#songs.intro` 하위에서만 — 첫 로드에만 붙는 클래스.
 - 파생 상태는 전부 `render()`에서 계산: 필터 칩 활성(`.on`)·카운트는 `filterCounts()`, 분류 술어는 `inCategory()` 하나를 목록·카운트가 공유한다. **me/filter에 의존하는 UI를 추가하면 그 상태 변경 경로에서 `render()`가 불리는지 확인할 것** (login, 필터 클릭 등이 이미 그렇게 한다).
 - 401 응답은 `api()`가 `clearAuth()`로 일괄 처리(모달 닫기 포함). 액션 핸들러의 catch는 `!accessCode`면 조용히 리턴한다.
