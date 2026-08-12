@@ -21,7 +21,12 @@ function save() {
 
 const app = express();
 app.use(express.json());
-app.use(express.static(path.join(__dirname, 'public')));
+// no-cache: 매 요청 ETag 재검증(변경 없으면 304) — 배포 직후 구버전 JS가 휴리스틱 캐시로 남는 것 방지
+app.use(
+  express.static(path.join(__dirname, 'public'), {
+    setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache'),
+  }),
+);
 
 // ---- 입장 인증코드: 밴드 공용 코드 1개, 기기당 1회 입력 ----
 const ACCESS_CODE = (process.env.ACCESS_CODE || 'yb2026').trim();
@@ -38,6 +43,9 @@ const authAttempts = new Map();
 app.post('/api/auth', (req, res) => {
   const ip = req.get('cf-connecting-ip') || req.ip;
   const now = Date.now();
+  // 만료 레코드 정리 — IP 로테이션으로 맵이 무한히 자라지 않게
+  if (authAttempts.size > 1000)
+    for (const [k, r] of authAttempts) if (now > r.resetAt) authAttempts.delete(k);
   const rec = authAttempts.get(ip) || { count: 0, resetAt: now + 60_000 };
   if (now > rec.resetAt) {
     rec.count = 0;
@@ -68,7 +76,7 @@ app.use('/api', (req, res, next) => {
 
 // 곡 링크는 http(s)만 저장 — javascript: 등 스킴 차단
 function cleanLink(link) {
-  const l = (link || '').trim();
+  const l = typeof link === 'string' ? link.trim() : '';
   return /^https?:\/\//i.test(l) ? l : '';
 }
 
