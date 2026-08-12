@@ -432,6 +432,16 @@ input:focus { outline: 2px solid var(--amber); border-color: transparent; }
 }
 .filter .cnt { color: #b5ab9d; font-size: 11.5px; font-weight: 500; }
 .filter.on .cnt { color: var(--amber); }
+/* '내 곡'은 상태 필터와 독립 토글 — 얇은 구분선으로 분리 */
+.filter.mine { margin-left: 6px; position: relative; }
+.filter.mine::before {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: 20%;
+  height: 60%;
+  border-left: 1px solid var(--line);
+}
 #search {
   flex: 1;
   min-width: 140px;

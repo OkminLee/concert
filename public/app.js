@@ -34,7 +34,8 @@ const ICONS = {
 };
 
 const expanded = new Set(); // 펼쳐진 곡 id — 재렌더에도 유지
-let filter = 'all';
+let filter = 'all'; // 상태 필터: all | open | full
+let mineOnly = false; // '내 곡' 토글 — 상태 필터와 독립 조합
 let query = '';
 
 const esc = (s) =>
@@ -222,6 +223,7 @@ $('#song-form').addEventListener('submit', async (e) => {
     setComposer(false);
     expanded.add(song.id); // 방금 올린 곡은 펼쳐서 보여준다
     filter = 'all'; // 활성 필터·검색이 새 곡을 숨기지 않도록 초기화
+    mineOnly = false; // 새 곡은 세션 신청 전이라 토글이 켜져 있으면 숨겨진다
     query = '';
     $('#search').value = '';
     await load();
@@ -246,7 +248,8 @@ $('#composer-toggle').addEventListener('click', () => {
 $('#filters').addEventListener('click', (e) => {
   const btn = e.target.closest('.filter');
   if (!btn) return;
-  filter = btn.dataset.filter; // 활성 표시는 render → filterCounts가 파생
+  if (btn.dataset.filter === 'mine') mineOnly = !mineOnly;
+  else filter = btn.dataset.filter; // 활성 표시는 render → filterCounts가 파생
   render();
 });
 $('#search').addEventListener('input', (e) => {
@@ -325,13 +328,13 @@ const playerHTML = (videoId) =>
   `<iframe src="https://www.youtube-nocookie.com/embed/${videoId}" title="YouTube 플레이어" allow="encrypted-media; picture-in-picture; web-share" allowfullscreen loading="lazy"></iframe>`;
 
 // 필터 분류 — 목록 필터링과 칩 카운트가 같은 술어를 공유한다
+const isMine = (song) => SESSIONS.some((s) => song.members[s].includes(me));
 function inCategory(song, name) {
   if (name === 'open') {
     const cls = remainInfo(song).cls;
     return cls === 'some' || cls === 'many';
   }
   if (name === 'full') return remainInfo(song).cls === 'full';
-  if (name === 'mine') return SESSIONS.some((s) => song.members[s].includes(me));
   return true;
 }
 
@@ -426,6 +429,7 @@ function songCard(song, idx) {
 
 function matchesFilter(song) {
   if (!inCategory(song, filter)) return false;
+  if (mineOnly && !isMine(song)) return false;
   if (query) {
     const haystack =
       `${song.title} ${song.artist} ${SESSIONS.flatMap((s) => song.members[s]).join(' ')}`.toLowerCase();
@@ -434,13 +438,16 @@ function matchesFilter(song) {
   return true;
 }
 
-// 칩 카운트와 활성 표시는 렌더마다 filter 상태에서 파생
+// 칩 카운트·활성 표시는 렌더마다 파생 — 숫자는 "그 칩을 눌렀을 때 보게 될 곡 수"
 function filterCounts() {
   $('#filters')
     .querySelectorAll('.filter')
     .forEach((b) => {
-      $('.cnt', b).textContent = songs.filter((s) => inCategory(s, b.dataset.filter)).length;
-      b.classList.toggle('on', b.dataset.filter === filter);
+      const mine = b.dataset.filter === 'mine';
+      $('.cnt', b).textContent = mine
+        ? songs.filter((s) => isMine(s) && inCategory(s, filter)).length
+        : songs.filter((s) => inCategory(s, b.dataset.filter) && (!mineOnly || isMine(s))).length;
+      b.classList.toggle('on', mine ? mineOnly : b.dataset.filter === filter);
     });
 }
 
@@ -538,6 +545,7 @@ async function poll() {
 $('#songs').addEventListener('click', async (e) => {
   if (e.target.closest('#clear-filter')) {
     filter = 'all';
+    mineOnly = false;
     query = '';
     $('#search').value = '';
     render();
@@ -689,10 +697,11 @@ $('#btn-export').insertAdjacentHTML('afterbegin', ICONS.playlist);
 $('#x-copy-name').innerHTML = ICONS.copy;
 
 let exportConfig = null; // /api/export-config 응답 캐시
-const FILTER_LABEL = { open: '모집 중', full: '모집 완료', mine: '내 곡' };
+const FILTER_LABEL = { open: '모집 중', full: '모집 완료' };
 function autoPlaylistName() {
   const d = new Date();
-  const label = FILTER_LABEL[filter] ? ` · ${FILTER_LABEL[filter]}` : '';
+  const label =
+    (FILTER_LABEL[filter] ? ` · ${FILTER_LABEL[filter]}` : '') + (mineOnly ? ' · 내 곡' : '');
   return `합주 세트리스트 ${d.getMonth() + 1}.${d.getDate()}${label}`;
 }
 const exportSelection = () =>
