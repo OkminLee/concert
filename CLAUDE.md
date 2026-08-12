@@ -28,6 +28,7 @@ curl -H 'x-access-code: <코드>' localhost:3000/api/songs
 - `public/` 수정은 즉시 반영(디스크에서 서빙). `server.js`·`data.json` 수정은 재시작 필요:
   `launchctl kickstart -k gui/$(id -u)/com.okmin.concert.server`
 - 로그: `~/Library/Logs/concert-{server,tunnel}.log`
+- Apple Music 연동: MusicKit developer token env(`APPLE_TEAM_ID`·`APPLE_KEY_ID`·`APPLE_MUSIC_KEY_PATH`)는 server plist의 EnvironmentVariables에, `.p8` 키 파일은 `~/.concert/`(repo 밖)에 둔다. env 변경은 kickstart가 아니라 bootout→bootstrap으로 재로드.
 
 ## 아키텍처
 

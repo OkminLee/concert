@@ -822,6 +822,141 @@ dialog .section-title { margin-top: 0; }
 }
 #feedback-form textarea:focus { outline: 2px solid var(--amber); border-color: transparent; }
 .dialog-actions { display: flex; justify-content: flex-end; gap: 8px; }
+
+/* ── 플레이리스트 추출 ── */
+#btn-export { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+#btn-export svg { width: 13px; height: 13px; }
+#btn-export:hover { color: var(--amber); border-color: var(--amber-deep); }
+.export { display: grid; gap: 10px; }
+.export:focus,
+.export:focus-visible { outline: none; }
+.export .section-title { margin-bottom: 0; }
+/* 이름 = 공연 타이틀: 디스플레이 서체 + 필드 안 복사 버튼 */
+.export-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: #16130f;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 2px 6px 2px 0;
+}
+.export-name:focus-within { outline: 2px solid var(--amber); border-color: transparent; }
+.export-name input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  font-family: var(--display);
+  font-size: 18px;
+  letter-spacing: 0.02em;
+  color: var(--ink);
+  padding: 9px 13px;
+}
+.export-name input:focus { outline: none; }
+/* 곡 목록 = 미니 세트리스트: 번호·점선 리더 재사용, 체크 해제는 취소선(곡 긋기) */
+.export-songs {
+  max-height: 220px;
+  overflow-y: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #16130f;
+  padding: 6px;
+}
+.export-song {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13.5px;
+  padding: 6px 8px;
+  border-radius: 7px;
+  cursor: pointer;
+}
+.export-song:hover { background: var(--bg-raised); }
+.export-song input {
+  appearance: none;
+  flex-shrink: 0;
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  border: 1.5px solid var(--ink-dim);
+  border-radius: 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.export-song input:checked { background: var(--amber); border-color: var(--amber); }
+.export-song input:checked::after {
+  content: '✓';
+  font-size: 11px;
+  font-weight: 800;
+  color: #221503;
+  line-height: 1;
+}
+.export-song input:focus-visible { outline: 2px solid var(--amber); outline-offset: 2px; }
+.export-song .x-no {
+  font-family: var(--display);
+  font-size: 14px;
+  color: var(--amber-deep);
+  opacity: 0.55;
+  min-width: 20px;
+  flex-shrink: 0;
+}
+.export-song strong { font-weight: 500; min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.export-song em { font-style: normal; font-size: 12px; color: var(--ink-dim); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex-shrink: 3; }
+.export-song .x-leader {
+  flex: 1;
+  min-width: 10px;
+  height: 0;
+  border-bottom: 2px dotted rgba(155, 145, 132, 0.22);
+}
+/* 체크 해제 = 세트리스트에서 곡 긋기 */
+.export-song:has(input:not(:checked)) .x-no { opacity: 0.25; }
+.export-song:has(input:not(:checked)) strong,
+.export-song:has(input:not(:checked)) em {
+  text-decoration: line-through;
+  text-decoration-color: rgba(255, 92, 77, 0.55);
+  text-decoration-thickness: 1.5px;
+  color: var(--ink-dim);
+}
+.export-song .no-link {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  color: var(--ink-dim);
+  border: 1px dashed var(--line);
+  border-radius: 999px;
+  padding: 1px 7px;
+}
+.export-target {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 0;
+  border-top: 1px dashed var(--line);
+}
+.export-info { display: grid; gap: 1px; min-width: 0; }
+.export-info strong { font-size: 14px; display: inline-flex; align-items: center; gap: 7px; }
+.export-info span { font-size: 12px; color: var(--ink-dim); word-break: keep-all; }
+.dot.svc-youtube { background: #ff4133; }
+.dot.svc-apple { background: var(--ink); }
+.dot.svc-spotify { background: #1db954; }
+.export-target button {
+  background: var(--bg-raised);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: var(--ink);
+  font: 500 13px var(--body);
+  padding: 8px 14px;
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.export-target button:hover:not(:disabled) { border-color: var(--amber-deep); color: var(--amber); }
+.export-target button:disabled { opacity: 0.45; cursor: default; }
+.parse-msg a { color: var(--amber); }
 .help ol { padding-left: 20px; display: grid; gap: 10px; font-size: 14.5px; }
 .help em { color: var(--amber); font-style: normal; font-weight: 700; }
 .help .dim { color: var(--ink-dim); }

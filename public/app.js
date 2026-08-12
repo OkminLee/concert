@@ -29,6 +29,8 @@ const ICONS = {
   mic: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="2" width="6" height="12" rx="3"/><path d="M5 10v1a7 7 0 0 0 14 0v-1M12 18v4"/></svg>',
   caret: '<svg class="caret" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m6 9 6 6 6-6"/></svg>',
   comment: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a8 8 0 0 1-8 8H4l2.5-2.7A8 8 0 1 1 21 12Z"/></svg>',
+  playlist: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15V6M18.5 18a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5ZM12 12H3M16 6H3M12 18H3"/></svg>',
+  copy: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="14" height="14" rx="2"/><path d="M4 16c-1.1 0-2-.9-2-2V4c0-1.1.9-2 2-2h10c1.1 0 2 .9 2 2"/></svg>',
 };
 
 const expanded = new Set(); // 펼쳐진 곡 id — 재렌더에도 유지
@@ -679,6 +681,253 @@ $('#feedback-form').addEventListener('submit', async (e) => {
   } catch (err) {
     msg.textContent = err.message;
     msg.classList.add('err');
+  }
+});
+
+/* ── 플레이리스트 추출 ── */
+$('#btn-export').insertAdjacentHTML('afterbegin', ICONS.playlist);
+$('#x-copy-name').innerHTML = ICONS.copy;
+
+let exportConfig = null; // /api/export-config 응답 캐시
+const FILTER_LABEL = { open: '모집 중', full: '모집 완료', mine: '내 곡' };
+function autoPlaylistName() {
+  const d = new Date();
+  const label = FILTER_LABEL[filter] ? ` · ${FILTER_LABEL[filter]}` : '';
+  return `합주 세트리스트 ${d.getMonth() + 1}.${d.getDate()}${label}`;
+}
+const exportSelection = () =>
+  [...document.querySelectorAll('#x-songs input:checked')]
+    .map((cb) => songs.find((s) => s.id === cb.value))
+    .filter(Boolean);
+const playlistText = (sel) =>
+  sel.map((s) => (s.artist ? `${s.artist} - ${s.title}` : s.title)).join('\n');
+
+function exportMsg(html, err = false) {
+  const msg = $('#x-msg');
+  msg.hidden = false;
+  msg.classList.toggle('err', err);
+  msg.innerHTML = html;
+}
+
+// 선택 변경마다 카운트·버튼 상태·서비스별 힌트를 다시 계산
+function syncExport() {
+  const sel = exportSelection();
+  const searched = sel.filter((s) => !youtubeId(s.link)).length;
+  $('#x-count').textContent = sel.length ? `— ${sel.length}곡 선택` : '';
+  $('#x-youtube').disabled = $('#x-spotify').disabled = $('#x-apple').disabled = !sel.length;
+  $('#x-yt-hint').textContent = !searched
+    ? '임시 재생목록으로 열어요'
+    : `임시 재생목록으로 열어요 — 링크 없는 ${searched}곡은 검색해서 채워요`;
+  const apple = !!exportConfig?.appleDeveloperToken;
+  $('#x-apple').textContent = apple ? '추가하기' : '목록 복사';
+  $('#x-apple-hint').textContent = apple
+    ? 'Apple Music 계정으로 로그인해 바로 만들어요'
+    : '뮤지션 - 곡명 목록을 복사해요';
+}
+
+$('#btn-export').addEventListener('click', async () => {
+  $('#x-name').value = autoPlaylistName();
+  $('#x-songs').innerHTML =
+    songs
+      .filter(matchesFilter) // 현재 필터·검색이 그대로 추출 범위
+      .map(
+        (s, i) => `
+          <label class="export-song">
+            <input type="checkbox" value="${s.id}" checked />
+            <span class="x-no">${String(i + 1).padStart(2, '0')}</span>
+            <strong>${esc(s.title)}</strong>
+            ${s.artist ? `<em>${esc(s.artist)}</em>` : ''}
+            <span class="x-leader" aria-hidden="true"></span>
+            ${youtubeId(s.link) ? '' : '<span class="no-link" title="유튜브 링크가 없어 검색 1위 결과로 채워요">검색 추가</span>'}
+          </label>`,
+      )
+      .join('') || '<p class="parse-msg">현재 필터에 곡이 없어요 — 필터를 바꿔보세요</p>';
+  $('#x-msg').hidden = true;
+  syncExport();
+  $('#export-dialog').showModal(); // 포커스는 dialog 내 autofocus 컨테이너로 — 이름 입력에 가면 모바일 키보드가 버튼을 가린다
+  if (!exportConfig) {
+    try {
+      exportConfig = await api('/api/export-config');
+      syncExport(); // Apple 행을 설정 상태에 맞게 갱신
+      if (exportConfig.appleDeveloperToken) ensureMusic().catch(() => {}); // 클릭 전 미리 로드 — authorize 팝업 차단 방지
+    } catch {
+      exportConfig = { appleDeveloperToken: null };
+    }
+  }
+});
+$('#x-songs').addEventListener('change', syncExport);
+$('#x-close').addEventListener('click', () => $('#export-dialog').close());
+
+$('#x-copy-name').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($('#x-name').value.trim());
+    exportMsg('플레이리스트 이름을 복사했어요');
+  } catch {
+    exportMsg('복사가 안 돼요 — 이름을 직접 드래그해서 복사해주세요', true);
+  }
+});
+
+// 링크 없는 곡은 서버 경유로 유튜브 검색해 채운다 — 성공만 캐시(실패는 재시도 가능하게)
+const ytFoundCache = new Map(); // song.id -> videoId
+async function resolveYoutubeIds(sel) {
+  const missing = sel.filter((s) => !youtubeId(s.link) && !ytFoundCache.has(s.id));
+  let done = 0;
+  for (const s of missing) {
+    exportMsg(`유튜브에서 검색 중… ${++done}/${missing.length}`);
+    try {
+      const { videoId } = await api('/api/search-youtube', 'POST', {
+        q: `${s.artist} ${s.title}`.trim(),
+      });
+      ytFoundCache.set(s.id, videoId);
+    } catch {
+      // 못 찾은 곡은 제외하고 진행
+    }
+  }
+  return sel.map((s) => youtubeId(s.link) || ytFoundCache.get(s.id)).filter(Boolean);
+}
+
+// 유튜브 익명 임시 재생목록 — 로그인 없이 생성, '저장'하면 내 계정에 담긴다 (최대 50곡)
+$('#x-youtube').addEventListener('click', async () => {
+  const sel = exportSelection();
+  const win = window.open('', '_blank'); // 검색 대기 후 window.open은 팝업 차단됨 → 클릭 시점에 미리 연다
+  $('#x-youtube').disabled = true;
+  try {
+    const ids = await resolveYoutubeIds(sel);
+    if (!ids.length) {
+      win?.close();
+      exportMsg('유튜브에서 곡을 찾지 못했어요', true);
+      return;
+    }
+    const url = `https://www.youtube.com/watch_videos?video_ids=${ids.slice(0, 50).join(',')}`;
+    if (win) {
+      win.opener = null;
+      win.location = url;
+    }
+    const missed = sel.length - ids.length;
+    exportMsg(
+      (ids.length > 50 ? '유튜브 임시 재생목록은 50곡까지라 앞의 50곡만 열었어요' :
+        `재생목록을 열었어요${missed ? ` (${missed}곡은 검색에서 못 찾음)` : ''}`) +
+        ` — 메뉴의 '재생목록에 저장' 후 이름을 "${esc($('#x-name').value.trim())}"로 지어주세요`,
+    );
+  } finally {
+    $('#x-youtube').disabled = false;
+  }
+});
+
+/* Apple Music 직접 생성 — 서버 developer token + MusicKit 사용자 로그인 */
+let musickitLoading = null;
+let musicConfigured = false;
+function loadMusicKit() {
+  if (window.MusicKit) return Promise.resolve();
+  if (!musickitLoading) {
+    musickitLoading = new Promise((resolve, reject) => {
+      document.addEventListener('musickitloaded', () => resolve(), { once: true });
+      const s = document.createElement('script');
+      s.src = 'https://js-cdn.music.apple.com/musickit/v3/musickit.js';
+      s.async = true;
+      s.onerror = () => {
+        musickitLoading = null;
+        reject(new Error('MusicKit 스크립트를 불러오지 못했어요'));
+      };
+      document.head.appendChild(s);
+    });
+  }
+  return musickitLoading;
+}
+async function ensureMusic() {
+  await loadMusicKit();
+  if (!musicConfigured) {
+    await MusicKit.configure({
+      developerToken: exportConfig.appleDeveloperToken,
+      app: { name: '합주 세트리스트', build: '1' },
+    });
+    musicConfigured = true;
+  }
+  return MusicKit.getInstance();
+}
+
+$('#x-apple').addEventListener('click', async () => {
+  const sel = exportSelection();
+  if (!exportConfig?.appleDeveloperToken) {
+    // 서버 키 미설정 — 목록 복사로 동작
+    try {
+      await navigator.clipboard.writeText(playlistText(sel));
+      exportMsg(`${sel.length}곡을 복사했어요`);
+    } catch {
+      exportMsg('복사가 안 돼요 — 다시 시도해주세요', true);
+    }
+    return;
+  }
+  const name = $('#x-name').value.trim() || autoPlaylistName();
+  $('#x-apple').disabled = true;
+  try {
+    exportMsg('Apple Music에 연결하는 중…');
+    const music = await ensureMusic();
+    // 팝업이 차단되면 authorize가 영원히 매달린다 — 3초 뒤에도 이 창에 포커스가 있으면 차단으로 판단
+    // (팝업이 열렸다면 포커스를 뺏기므로 오탐 없음. 로그인 창이 떠 있으면 얼마든지 기다린다)
+    await Promise.race([
+      music.authorize(),
+      new Promise((_, reject) =>
+        setTimeout(() => {
+          if (document.hasFocus())
+            reject(
+              new Error(
+                '로그인 팝업이 차단된 것 같아요 — 팝업 허용 후 다시 눌러주세요. 슬랙·카톡 안에서 열었다면 Safari나 Chrome으로 열어주세요',
+              ),
+            );
+        }, 3000),
+      ),
+    ]);
+    const found = [];
+    let missed = 0;
+    for (let i = 0; i < sel.length; i++) {
+      exportMsg(`Apple Music에서 검색 중… ${i + 1}/${sel.length}`);
+      try {
+        const r = await music.api.music('/v1/catalog/{{storefrontId}}/search', {
+          term: `${sel[i].artist} ${sel[i].title}`.trim(),
+          types: 'songs',
+          limit: 1,
+        });
+        const song = (r.data ?? r).results?.songs?.data?.[0];
+        if (song) found.push(song.id);
+        else missed++;
+      } catch {
+        missed++;
+      }
+    }
+    if (!found.length) {
+      exportMsg('Apple Music에서 곡을 찾지 못했어요', true);
+      return;
+    }
+    exportMsg('플레이리스트를 만드는 중…');
+    await music.api.music('/v1/me/library/playlists', {}, {
+      fetchOptions: {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          attributes: { name, description: '합주 세트리스트에서 내보냄' },
+          relationships: { tracks: { data: found.map((id) => ({ id, type: 'songs' })) } },
+        }),
+      },
+    });
+    exportMsg(
+      `Apple Music 보관함에 "${esc(name)}"를 만들었어요 (${found.length}곡${missed ? `, ${missed}곡은 못 찾음` : ''})`,
+    );
+  } catch (err) {
+    exportMsg(esc(err?.message || 'Apple Music 내보내기에 실패했어요'), true);
+  } finally {
+    $('#x-apple').disabled = false;
+  }
+});
+
+// Spotify — 직접 생성은 개발 모드 5인 제한(2026.2 정책)이라 보류, 목록 복사 제공
+$('#x-spotify').addEventListener('click', async () => {
+  const sel = exportSelection();
+  try {
+    await navigator.clipboard.writeText(playlistText(sel));
+    exportMsg(`${sel.length}곡을 복사했어요 — Spotify 플레이리스트 만들 때 붙여넣어 검색하면 돼요`);
+  } catch {
+    exportMsg('복사가 안 돼요 — 다시 시도해주세요', true);
   }
 });
 

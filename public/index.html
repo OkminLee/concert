@@ -8,7 +8,8 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet" />
-  <link rel="stylesheet" href="style.css" />
+  <!-- ?v= 은 배포 시 구버전 자산 캐시 무효화용 — app.js·style.css 동시 갱신 -->
+  <link rel="stylesheet" href="style.css?v=3" />
 </head>
 <body>
 
@@ -103,6 +104,7 @@
           <button type="button" class="filter" data-filter="mine">내 곡 <span class="cnt"></span></button>
         </div>
         <input id="search" type="search" placeholder="곡 · 뮤지션 · 멤버 검색" autocomplete="off" />
+        <button type="button" id="btn-export" class="ghost" title="현재 목록으로 플레이리스트 추출">플레이리스트</button>
       </div>
       <div id="songs"></div>
     </section>
@@ -137,6 +139,46 @@
     </form>
   </dialog>
 
+  <!-- 플레이리스트 추출: 현재 필터의 곡을 골라 서비스별로 내보내기 -->
+  <dialog id="export-dialog">
+    <!-- autofocus: showModal 기본 포커스가 이름 입력으로 가면 모바일 키보드가 버튼을 가린다 -->
+    <div class="export" tabindex="-1" autofocus>
+      <h2 class="section-title">플레이리스트 추출 <span id="x-count"></span></h2>
+      <div class="export-name">
+        <input id="x-name" type="text" maxlength="60" autocomplete="off" aria-label="플레이리스트 이름" />
+        <button type="button" class="icon-btn" id="x-copy-name" title="이름 복사"></button>
+      </div>
+      <div class="export-songs" id="x-songs"></div>
+      <div class="export-targets">
+        <div class="export-target">
+          <div class="export-info">
+            <strong><i class="dot svc-youtube" aria-hidden="true"></i>YouTube Music</strong>
+            <span id="x-yt-hint"></span>
+          </div>
+          <button type="button" id="x-youtube">재생목록 열기 ↗</button>
+        </div>
+        <div class="export-target">
+          <div class="export-info">
+            <strong><i class="dot svc-apple" aria-hidden="true"></i>Apple Music</strong>
+            <span id="x-apple-hint"></span>
+          </div>
+          <button type="button" id="x-apple">추가하기</button>
+        </div>
+        <div class="export-target">
+          <div class="export-info">
+            <strong><i class="dot svc-spotify" aria-hidden="true"></i>Spotify</strong>
+            <span>뮤지션 - 곡명 목록을 복사해요</span>
+          </div>
+          <button type="button" id="x-spotify">목록 복사</button>
+        </div>
+      </div>
+      <p id="x-msg" class="parse-msg" aria-live="polite" hidden></p>
+      <div class="dialog-actions">
+        <button type="button" class="ghost" id="x-close">닫기</button>
+      </div>
+    </div>
+  </dialog>
+
   <!-- 사용법 다이얼로그 (시트의 "설명 탭") -->
   <dialog id="help-dialog">
     <div class="help">
@@ -151,6 +193,6 @@
     </div>
   </dialog>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=3"></script>
 </body>
 </html>

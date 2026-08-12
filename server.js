@@ -293,6 +293,75 @@ app.post('/api/parse-link', async (req, res) => {
   }
 });
 
+// ---- 유튜브 검색 보충: 링크 없는 곡을 "뮤지션 제목"으로 검색해 첫 결과 사용 ----
+// 공식 Data API는 키가 필요해 결과 페이지를 파싱한다 — 마크업 변경 시 이 정규식만 손보면 됨
+const ytSearchCache = new Map(); // q -> videoId
+app.post('/api/search-youtube', async (req, res) => {
+  const q = typeof req.body?.q === 'string' ? req.body.q.trim() : '';
+  if (!q) return res.status(400).json({ error: '검색어가 필요해요' });
+  if (ytSearchCache.has(q)) return res.json({ videoId: ytSearchCache.get(q) });
+  try {
+    // 여러 곡 연속 검색 시 간헐 실패가 잦아 1회 재시도
+    let html;
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const r = await fetch(
+          `https://www.youtube.com/results?search_query=${encodeURIComponent(q)}`,
+          {
+            headers: {
+              'User-Agent':
+                'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126 Safari/537.36',
+              'Accept-Language': 'ko',
+            },
+            signal: AbortSignal.timeout(6000),
+          },
+        );
+        if (!r.ok) throw new Error(`yt ${r.status}`);
+        html = await r.text();
+        break;
+      } catch (e) {
+        if (attempt >= 1) throw e;
+        await new Promise((resolve) => setTimeout(resolve, 400));
+      }
+    }
+    const m = html.match(/"videoRenderer":\{"videoId":"([\w-]{6,})"/);
+    if (!m) return res.status(404).json({ error: '검색 결과가 없어요' });
+    if (ytSearchCache.size > 500) ytSearchCache.clear();
+    ytSearchCache.set(q, m[1]);
+    res.json({ videoId: m[1] });
+  } catch {
+    res.status(502).json({ error: '유튜브 검색에 실패했어요' });
+  }
+});
+
+// ---- Apple Music developer token (MusicKit) ----
+// env 3개가 모두 있어야 발급 — 없으면 null이 내려가고 클라이언트는 목록 복사로 동작
+const APPLE_TEAM_ID = process.env.APPLE_TEAM_ID || '';
+const APPLE_KEY_ID = process.env.APPLE_KEY_ID || '';
+const APPLE_KEY_PATH = process.env.APPLE_MUSIC_KEY_PATH || '';
+let appleToken = { value: null, exp: 0 };
+function appleDeveloperToken() {
+  if (!APPLE_TEAM_ID || !APPLE_KEY_ID || !APPLE_KEY_PATH) return null;
+  const now = Math.floor(Date.now() / 1000);
+  if (appleToken.value && now < appleToken.exp - 3600) return appleToken.value;
+  try {
+    const key = fs.readFileSync(APPLE_KEY_PATH, 'utf8');
+    const b64 = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
+    const exp = now + 60 * 60 * 24 * 30;
+    const data = `${b64({ alg: 'ES256', kid: APPLE_KEY_ID, typ: 'JWT' })}.${b64({ iss: APPLE_TEAM_ID, iat: now, exp })}`;
+    const sig = crypto
+      .sign('sha256', Buffer.from(data), { key, dsaEncoding: 'ieee-p1363' })
+      .toString('base64url');
+    appleToken = { value: `${data}.${sig}`, exp };
+    return appleToken.value;
+  } catch {
+    return null; // 키 파일 오류 — 미설정과 동일하게 동작
+  }
+}
+app.get('/api/export-config', (req, res) => {
+  res.json({ appleDeveloperToken: appleDeveloperToken() });
+});
+
 app.listen(PORT, () => {
   console.log(`🎸 concert running on http://localhost:${PORT}`);
 });
