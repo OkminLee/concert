@@ -9,7 +9,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet" />
   <!-- ?v= 은 배포 시 구버전 자산 캐시 무효화용 — app.js·style.css 동시 갱신 -->
-  <link rel="stylesheet" href="style.css?v=4" />
+  <link rel="stylesheet" href="style.css?v=11" />
 </head>
 <body>
 
@@ -69,6 +69,9 @@
   </header>
 
   <main>
+    <!-- 다가오는 합주 히어로 + 응답 현황 (아코디언 밖 최상단) — app.js renderSchedule이 렌더 -->
+    <div id="gig-top" class="gig-top"></div>
+
     <!-- 곡 적기 (접힘 기본) -->
     <section class="composer" id="composer">
       <button type="button" id="composer-toggle" aria-expanded="false">
@@ -91,6 +94,21 @@
       </form>
       </div>
       </div>
+    </section>
+
+    <!-- 합주 일정: 가능 시간 히트맵(when2meet식) + 확정 합주일. 내부는 app.js가 렌더 -->
+    <section class="scheduler" id="scheduler">
+      <button type="button" id="scheduler-toggle" aria-expanded="false">
+        <span class="section-title">가능 시간 칠하기</span>
+        <span class="sched-chip" id="sched-chip" hidden></span>
+      </button>
+      <div class="scheduler-body">
+        <div class="acc-clip">
+          <div class="sched" id="sched-inner"></div>
+        </div>
+      </div>
+      <!-- 그룹 그리드 hover 명단 팝업 (커서 추종, position: fixed) -->
+      <div id="sg-pop" class="sg-pop" hidden></div>
     </section>
 
     <!-- 곡 리스트 -->
@@ -188,11 +206,13 @@
         <li>곡마다 필요한 세션이 달라요 — 기타가 1명일 수도 3명일 수도, 키보드가 아예 없을 수도 있어요. 곡을 들어보고 인원수를 정해주세요. (인원수가 잘못돼 있으면 카드의 연필 버튼으로 자유롭게 고쳐주세요!)</li>
         <li>하고 싶은 곡을 펼치면 <strong>무대</strong>가 보여요. 빈 자리 <strong>+</strong>를 누르면 그 자리에 올라가고, 내 자리를 다시 누르면 내려옵니다. 정원보다 많아도 일단 올라가두고 조율하면 됩니다.</li>
         <li>하고 싶은 말은 곡 카드 아래 <strong>코멘트</strong>에 자유롭게! <span class="dim">ex) 곡 좋은데 어려워서 못할 것 같아요ㅠㅠ / 오 이거 너무너무 좋다</span></li>
+        <li><strong>합주 일정</strong>은 주간 캘린더예요. 왼쪽 <em>내 가능 시간</em> 표의 아무 날짜나 드래그해 칠하면 바로 조율이 시작돼요(‹ ›로 주 이동). 오른쪽 <em>모두의 가능 시간</em>은 밝을수록 모일 수 있는 사람이 많고, 칸에 커서를 올리면 누가 되는지 보여요. 아직 안 칠한 멤버는 <em>콕 찌르기</em>로 불러오세요!</li>
+        <li>다 모이면 그 시간으로 <strong>합주일 확정</strong> — 확정된 날짜는 후보에서 빠지고 카드로 올라가요. 카드에서 <em>캘린더 추가</em>(.ics)와 <em>공지 복사</em>를 쓸 수 있어요.</li>
       </ol>
       <button class="submit" id="help-close">알겠어요!</button>
     </div>
   </dialog>
 
-  <script src="app.js?v=4"></script>
+  <script src="app.js?v=11"></script>
 </body>
 </html>
