@@ -1564,7 +1564,21 @@ $('#stage-filters').addEventListener('click', e => {
   if (btn) { stageFilter = btn.dataset.stage; render(); $('#stage-filters [data-stage="' + stageFilter + '"]').focus(); }
 });
 $('#song-dialog-close').addEventListener('click', () => $('#song-dialog').close());
+const songDialog = $('#song-dialog');
+let cardBackdropPressed = false;
+function outsideCardDialog(event) {
+  const rect = songDialog.getBoundingClientRect();
+  return event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom;
+}
+songDialog.addEventListener('pointerdown', event => { cardBackdropPressed = outsideCardDialog(event); });
+songDialog.addEventListener('pointercancel', () => { cardBackdropPressed = false; });
+songDialog.addEventListener('click', event => {
+  const dismiss = cardBackdropPressed && outsideCardDialog(event);
+  cardBackdropPressed = false;
+  if (dismiss) songDialog.close();
+});
 $('#song-dialog').addEventListener('close', () => {
+  cardBackdropPressed = false;
   const id = [...expanded][0];
   expanded.clear();
   render();
