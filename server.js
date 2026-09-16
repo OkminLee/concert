@@ -3,6 +3,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { execFile } = require('child_process');
+const { linkKey } = require('./public/discovery');
 
 const PORT = process.env.PORT || 3000;
 const DATA_FILE = path.join(__dirname, 'data.json');
@@ -122,6 +123,9 @@ app.post('/api/songs', (req, res) => {
   const { title, artist, link, slots, nickname } = req.body || {};
   if (!nickname?.trim()) return res.status(400).json({ error: '닉네임이 필요해요' });
   if (!title?.trim()) return res.status(400).json({ error: '곡 이름이 필요해요' });
+  const key = linkKey(cleanLink(link));
+  if (key && db.songs.some(s => linkKey(s.link) === key))
+    return res.status(409).json({ error: '이미 등록된 곡 링크예요. 기존 곡에서 참여해주세요.' });
   const song = {
     id: crypto.randomUUID(),
     title: title.trim(),
@@ -502,6 +506,7 @@ function appleDeveloperToken() {
 app.get('/api/export-config', (req, res) => {
   res.json({ appleDeveloperToken: appleDeveloperToken() });
 });
+require('./music-search').install(app, appleDeveloperToken);
 
 // ---- MCP (Model Context Protocol) — 프데(Friday) 등 에이전트 연동 ----
 // Streamable HTTP 무상태 구현: POST JSON-RPC 단건, 세션·SSE 없음. 인증은 웹과 같은 x-access-code 헤더.

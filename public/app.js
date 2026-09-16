@@ -41,6 +41,10 @@ const expanded = new Set(); // 펼쳐진 곡 id — 재렌더에도 유지
 let filter = 'all'; // 상태 필터: all | open | full
 let mineOnly = false; // '내 곡' 토글 — 상태 필터와 독립 조합
 let query = '';
+let roleFilter = '';
+let stageFilter = 'all';
+let songSort = localStorage.getItem('concert-sort') || 'latest';
+let boardLayout = localStorage.getItem('concert-layout') !== 'list';
 
 const esc = (s) =>
   String(s).replace(/[&<>"']/g, (c) =>
@@ -223,10 +227,14 @@ $('#song-form').addEventListener('submit', async (e) => {
       nickname: me,
     });
     $('#song-form').reset();
+    invalidateMusicSearch();
+    $('#music-query').value = '';
+    $('#music-status').textContent = '추가했어요. 다음 곡을 검색할 수 있어요.';
     $('#parse-msg').hidden = true;
     renderSteppers($('#f-slots'), { ...DEFAULT_SLOTS });
     setComposer(false);
-    expanded.add(song.id); // 방금 올린 곡은 펼쳐서 보여준다
+    // 새 곡은 분류된 목록에서 바로 찾을 수 있도록 필터를 초기화한다
+    roleFilter = ''; stageFilter = 'all'; $('#role-filter').value = '';
     filter = 'all'; // 활성 필터·검색이 새 곡을 숨기지 않도록 초기화
     mineOnly = false; // 새 곡은 세션 신청 전이라 토글이 켜져 있으면 숨겨진다
     query = '';
@@ -246,7 +254,7 @@ function setComposer(open) {
 $('#composer-toggle').addEventListener('click', () => {
   const open = !$('#composer').classList.contains('open');
   setComposer(open);
-  if (open) $('#f-link').focus();
+  if (open) $('#music-query').focus();
 });
 
 /* ── 합주 일정 (when2meet식 가능 시간 히트맵 + 확정 합주일) ── */
@@ -843,13 +851,10 @@ $('#search').addEventListener('input', (e) => {
 
 /* ── 곡 리스트 ── */
 function remainInfo(song) {
-  const need = SESSIONS.reduce((a, s) => a + song.slots[s], 0);
-  if (need === 0) return { cls: 'none', text: '정원 미정' };
-  const have = SESSIONS.reduce((a, s) => a + Math.min(song.members[s].length, song.slots[s]), 0);
-  const remain = need - have;
-  if (remain <= 0) return { cls: 'full', text: '모집 완료 ✓' };
-  if (remain <= 2) return { cls: 'some', text: `${remain}명 남음` };
-  return { cls: 'many', text: `${remain}명 남음` };
+  const state = Discovery.state(song);
+  if (state.id === 'unset') return { cls: 'none', text: '정원 미설정' };
+  if (state.id === 'full') return { cls: 'full', text: '모집 완료' };
+  return { cls: state.id === 'near' ? 'some' : 'many', text: state.left + '자리 남음' };
 }
 
 // 세션 충원 상태 — 행 요약(minis)과 펼침 세션 행이 같은 규칙을 공유한다
@@ -914,11 +919,9 @@ const playerHTML = (videoId) =>
 // 필터 분류 — 목록 필터링과 칩 카운트가 같은 술어를 공유한다
 const isMine = (song) => SESSIONS.some((s) => song.members[s].includes(me));
 function inCategory(song, name) {
-  if (name === 'open') {
-    const cls = remainInfo(song).cls;
-    return cls === 'some' || cls === 'many';
-  }
-  if (name === 'full') return remainInfo(song).cls === 'full';
+  const state = Discovery.state(song);
+  if (name === 'open') return state.cap > 0 && state.left > 0;
+  if (name === 'full') return state.id === 'full';
   return true;
 }
 
@@ -957,13 +960,8 @@ function songCard(song, idx) {
 
   const open = expanded.has(song.id);
   // 접힌 행의 세션 요약: 세션색 점 + 충원 현황 (모바일에선 점만)
-  const minis = activeSessions(song)
-    .map((s) => {
-      const { cap, cnt, cls } = sessionStat(song, s);
-      const label = `${SESSION_META[s].label} ${cnt}/${cap}`;
-      return `<span class="mini ${cls}" title="${label}" aria-label="${label}"><i class="dot ${s}"></i><span class="mini-num">${cnt}/${cap}</span></span>`;
-    })
-    .join('');
+  const minis = activeSessions(song).filter(s => song.slots[s] > song.members[s].length)
+    .map(s => '<span class="vacancy">' + SESSION_META[s].label + ' ' + (song.slots[s] - song.members[s].length) + '</span>').join('');
   const cmt = song.comments.length
     ? `<span class="mini cmt" title="코멘트 ${song.comments.length}개">${ICONS.comment}<span class="mini-num">${song.comments.length}</span></span>`
     : '';
@@ -978,7 +976,7 @@ function songCard(song, idx) {
   return `
     <article class="song ${open ? 'open' : ''}" data-id="${song.id}">
       <button type="button" class="row-head" data-act="toggle" aria-expanded="${open}">
-        ${thumb}
+        <span class="song-number">${no}</span>
         <span class="col">
           <strong>${esc(song.title)}</strong>
           ${song.artist ? `<em>${esc(song.artist)}</em>` : ''}
@@ -1014,6 +1012,8 @@ function songCard(song, idx) {
 }
 
 function matchesFilter(song) {
+  if (roleFilter && song.slots[roleFilter] <= song.members[roleFilter].length) return false;
+  if (stageFilter !== 'all' && Discovery.state(song).id !== stageFilter) return false;
   if (!inCategory(song, filter)) return false;
   if (mineOnly && !isMine(song)) return false;
   if (query) {
@@ -1042,50 +1042,62 @@ const cardCache = new Map(); // song.id -> 마지막 렌더 HTML
 
 function render() {
   const container = $('#songs');
-  for (const id of [...expanded]) if (!songs.some((s) => s.id === id)) expanded.delete(id);
-  const visible = songs.map((s, i) => ({ s, i })).filter(({ s }) => matchesFilter(s));
-  filterCounts();
-  $('#song-count').textContent = !songs.length
-    ? ''
-    : visible.length === songs.length
-      ? `— ${songs.length}곡`
-      : `— ${visible.length}/${songs.length}곡`;
-  if (!songs.length || !visible.length) {
-    cardCache.clear();
-    container.innerHTML = !songs.length
-      ? '<div class="empty">아직 곡이 없어요. 첫 곡을 올려주세요!</div>'
-      : '<div class="empty">조건에 맞는 곡이 없어요<br /><button type="button" class="ghost" id="clear-filter">필터 초기화</button></div>';
-    return;
+  for (const id of [...expanded]) if (!songs.some(s => s.id === id)) {
+    expanded.delete(id); $('#song-dialog').close();
   }
-  container.querySelector('.empty')?.remove();
-  const seen = new Set();
-  let anchor = null;
-  for (const { s, i } of visible) {
+  const visible = songs.map((s, i) => ({s, i})).filter(({s}) => matchesFilter(s)).sort((a, b) =>
+    songSort === 'latest' ? Date.parse(b.s.createdAt) - Date.parse(a.s.createdAt) :
+    (a.s[songSort] || '').localeCompare(b.s[songSort] || '', 'ko'));
+  filterCounts();
+  $('#song-count').textContent = '— ' + visible.length + '/' + songs.length + '곡';
+  container.classList.toggle('board-layout', boardLayout);
+  $('#layout-toggle').textContent = boardLayout ? '목록 보기' : '보드 보기';
+  $('#song-sort').value = songSort;
+  const oldStage = stageFilter;
+  stageFilter = 'all';
+  const stageBase = songs.filter(matchesFilter);
+  stageFilter = oldStage;
+  $('#stage-filters').innerHTML = [{id:'all', label:'모든 단계'}, ...Discovery.stages].map(st =>
+    '<button type="button" data-stage="' + st.id + '" class="' + (stageFilter === st.id ? 'on' : '') + '" aria-pressed="' + (stageFilter === st.id) + '">' +
+    esc(st.label) + ' <span>' + stageBase.filter(s => st.id === 'all' || Discovery.state(s).id === st.id).length + '</span></button>').join('');
+  if (!container.querySelector('.song-group')) {
+    container.innerHTML = Discovery.stages.map(st => '<section class="song-group stage-' + st.id + '" data-group="' + st.id + '"><h3><i class="status-dot"></i>' + esc(st.label) + ' <span class="group-count"></span><small>' + esc(st.hint) + '</small></h3><div class="group-items"></div></section>').join('') +
+      '<div class="empty" hidden>조건에 맞는 곡이 없어요<br><button type="button" class="ghost" id="clear-filter">필터 초기화</button></div>';
+  }
+  const seen = new Set(), anchors = new Map();
+  for (const {s, i} of visible) {
     seen.add(s.id);
     const html = songCard(s, i);
-    let el = container.querySelector(`[data-id="${s.id}"]`);
+    let el = $('#song-workspace').querySelector('.song[data-id="' + s.id + '"]');
     if (!el || cardCache.get(s.id) !== html) {
-      const tpl = document.createElement('template');
-      tpl.innerHTML = html;
+      const tpl = document.createElement('template'); tpl.innerHTML = html;
       const fresh = tpl.content.firstElementChild;
       if (el) el.replaceWith(fresh);
-      else container.appendChild(fresh);
       el = fresh;
     }
     cardCache.set(s.id, html);
-    if (anchor) {
-      if (anchor.nextElementSibling !== el) anchor.after(el);
-    } else if (container.firstElementChild !== el) {
-      container.prepend(el);
+    if (expanded.has(s.id) && $('#song-dialog').open) {
+      if (el.parentElement !== $('#song-dialog-body')) $('#song-dialog-body').append(el);
+      continue;
     }
-    anchor = el;
+    const group = Discovery.state(s).id;
+    const parent = container.querySelector('[data-group="' + group + '"] .group-items');
+    const anchor = anchors.get(group);
+    if (anchor) { if (anchor.nextElementSibling !== el) anchor.after(el); }
+    else if (parent.firstElementChild !== el) parent.prepend(el);
+    anchors.set(group, el);
   }
-  for (const el of [...container.querySelectorAll('.song')]) {
-    if (!seen.has(el.dataset.id)) {
-      cardCache.delete(el.dataset.id);
-      el.remove();
-    }
+  for (const el of [...$('#song-workspace').querySelectorAll('.song')]) if (!seen.has(el.dataset.id)) {
+    if (expanded.has(el.dataset.id)) { expanded.delete(el.dataset.id); $('#song-dialog').close(); }
+    cardCache.delete(el.dataset.id); el.remove();
   }
+  for (const st of Discovery.stages) {
+    const group = container.querySelector('[data-group="' + st.id + '"]');
+    const count = visible.filter(({s}) => Discovery.state(s).id === st.id).length;
+    group.hidden = !count;
+    $('.group-count', group).textContent = count;
+  }
+  $('.empty', container).hidden = !!visible.length;
 }
 
 // 서버 응답 곡 하나를 반영 — keyed diff가 해당 카드만 교체
@@ -1128,9 +1140,10 @@ async function poll() {
 }
 
 /* ── 카드 내 액션 (이벤트 위임) ── */
-$('#songs').addEventListener('click', async (e) => {
+$('#song-workspace').addEventListener('click', async (e) => {
   if (e.target.closest('#clear-filter')) {
     filter = 'all';
+    roleFilter = ''; stageFilter = 'all'; $('#role-filter').value = '';
     mineOnly = false;
     query = '';
     $('#search').value = '';
@@ -1154,6 +1167,10 @@ $('#songs').addEventListener('click', async (e) => {
         const player = card.querySelector('.player');
         if (player) player.innerHTML = willOpen ? playerHTML(player.dataset.video) : ''; // 접으면 재생 중지
         cardCache.set(id, songCard(song, songs.findIndex((s) => s.id === id)));
+        if (willOpen) {
+          $('#song-dialog-body').append(card);
+          $('#song-dialog').showModal();
+        } else $('#song-dialog').close();
         return;
       }
       case 'join':
@@ -1205,7 +1222,7 @@ $('#songs').addEventListener('click', async (e) => {
   }
 });
 
-$('#songs').addEventListener('submit', async (e) => {
+$('#song-workspace').addEventListener('submit', async (e) => {
   const form = e.target.closest('form[data-act="comment"]');
   if (!form) return;
   e.preventDefault();
@@ -1325,6 +1342,9 @@ $('#btn-export').addEventListener('click', async () => {
   $('#x-songs').innerHTML =
     songs
       .filter(matchesFilter) // 현재 필터·검색이 그대로 추출 범위
+      .sort((a, b) =>
+        Discovery.stages.findIndex(st => st.id === Discovery.state(a).id) - Discovery.stages.findIndex(st => st.id === Discovery.state(b).id) ||
+        (songSort === 'latest' ? Date.parse(b.createdAt) - Date.parse(a.createdAt) : (a[songSort] || '').localeCompare(b[songSort] || '', 'ko')))
       .map(
         (s, i) => `
           <label class="export-song">
@@ -1524,6 +1544,87 @@ $('#x-spotify').addEventListener('click', async () => {
   } catch {
     exportMsg('복사가 안 돼요 — 다시 시도해주세요', true);
   }
+});
+
+/* ── 탐색 · 외부 곡 검색 ── */
+$('#btn-add-song').addEventListener('click', () => {
+  setComposer(true);
+  $('#composer').scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $('#music-query').focus();
+});
+$('#role-filter').addEventListener('change', e => { roleFilter = e.target.value; render(); });
+$('#song-sort').addEventListener('change', e => {
+  songSort = e.target.value; localStorage.setItem('concert-sort', songSort); render();
+});
+$('#layout-toggle').addEventListener('click', () => {
+  boardLayout = !boardLayout; localStorage.setItem('concert-layout', boardLayout ? 'board' : 'list'); render();
+});
+$('#stage-filters').addEventListener('click', e => {
+  const btn = e.target.closest('[data-stage]');
+  if (btn) { stageFilter = btn.dataset.stage; render(); $('#stage-filters [data-stage="' + stageFilter + '"]').focus(); }
+});
+$('#song-dialog-close').addEventListener('click', () => $('#song-dialog').close());
+$('#song-dialog').addEventListener('close', () => {
+  const id = [...expanded][0];
+  expanded.clear();
+  render();
+  if (id) $('.song[data-id="' + id + '"] .row-head')?.focus({ preventScroll: true });
+});
+let musicProvider = 'youtube', musicResults = [], musicRequest = 0;
+function invalidateMusicSearch() {
+  musicRequest++;
+  musicResults = [];
+  $('#music-results').replaceChildren();
+}
+$('#music-providers').addEventListener('click', e => {
+  const btn = e.target.closest('[data-provider]');
+  if (!btn) return;
+  musicProvider = btn.dataset.provider;
+  document.querySelectorAll('[data-provider]').forEach(b => {
+    b.classList.toggle('on', b === btn); b.setAttribute('aria-pressed', b === btn);
+  });
+  invalidateMusicSearch();
+  $('#music-status').textContent = '검색어를 입력하고 검색을 눌러주세요.';
+  if ($('#music-query').value.trim()) $('#music-search-form').requestSubmit();
+});
+$('#music-query').addEventListener('input', () => {
+  invalidateMusicSearch(); $('#music-status').textContent = '검색을 눌러 결과를 확인하세요.';
+});
+$('#music-search-form').addEventListener('submit', async e => {
+  e.preventDefault();
+  const q = $('#music-query').value.trim();
+  if (!q) return;
+  const sequence = ++musicRequest;
+  musicResults = [];
+  $('#music-results').replaceChildren();
+  $('#music-status').textContent = '검색 중…';
+  try {
+    const data = await api('/api/music-search?' + new URLSearchParams({ provider: musicProvider, q }));
+    if (sequence !== musicRequest || !accessCode) return;
+    musicResults = data.results;
+    $('#music-status').textContent = musicResults.length ? musicResults.length + '개 결과 · 곡을 선택한 뒤 파트 정원을 확인해주세요.' : '검색 결과가 없어요. 다른 검색어로 찾아보세요.';
+    $('#music-results').innerHTML = musicResults.map((r, i) => {
+      const duplicate = songs.some(s => Discovery.linkKey(s.link) === Discovery.linkKey(r.url));
+      return '<div class="music-result">' + (r.artwork ? '<img src="' + esc(r.artwork) + '" alt="" loading="lazy">' : '') +
+        '<div><strong>' + esc(r.title) + '</strong><small>' + esc(r.artist) + ' · ' + esc(r.duration) + '</small></div>' +
+        '<a href="' + esc(r.url) + '" target="_blank" rel="noopener">듣기</a><button type="button" data-pick="' + i + '" ' + (duplicate ? 'disabled' : '') + '>' + (duplicate ? '등록됨' : '선택') + '</button></div>';
+    }).join('');
+  } catch (err) {
+    if (sequence === musicRequest && accessCode) $('#music-status').textContent = err.message;
+  }
+});
+$('#music-results').addEventListener('click', e => {
+  const btn = e.target.closest('[data-pick]');
+  if (!btn || btn.disabled) return;
+  const result = musicResults[Number(btn.dataset.pick)];
+  $('#f-title').value = result.title;
+  $('#f-artist').value = result.artist;
+  $('#f-link').value = result.url;
+  $('#parse-msg').hidden = false;
+  $('#parse-msg').classList.remove('err');
+  $('#parse-msg').textContent = '곡 정보를 채웠어요. 제목·뮤지션과 파트 정원을 확인한 뒤 추가해주세요.';
+  $('#song-form').scrollIntoView({ behavior: 'smooth', block: 'center' });
+  $('#f-title').focus({ preventScroll: true });
 });
 
 /* ── 시작 ── */

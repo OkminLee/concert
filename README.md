@@ -4,6 +4,9 @@
 
 ## 기능
 
+- **상태별 탐색** — 모집 시작 / 모이는 중 / 완료 임박 / 모집 완료를 보드나 목록으로 탐색. 파트별 빈자리 필터·모집 단계·내 곡을 조합하고 곡명/뮤지션/최근 추가순으로 정렬. 정원이 0인 곡은 별도 분류한다.
+- **음악 서비스 검색 추가** — 곡 추가에서 YouTube·Apple Music·Spotify 검색 → 결과 선택 → 곡 정보와 파트 정원 확인 → 등록. 동일 링크의 중복 등록은 차단한다.
+
 - **인증코드 게이트** — 입장 전 밴드 공용 인증코드 입력 (`ACCESS_CODE` env로 설정 — **운영 시 반드시 기본값에서 변경**). 모든 API도 코드 헤더 없으면 401, `/api/auth`는 IP당 분당 10회 제한. 기기당 1회 입력 후 저장
 - **프로필 로그인** — Slack #yb 멤버 프로필(아바타)을 골라 입장, 선택은 저장되어 재입장 시 생략. 목록에 없으면 닉네임 직접 입력
 - **곡 추가**
@@ -44,6 +47,12 @@ cloudflared tunnel run concert           # 고정 도메인 터널 (~/.cloudflar
 - Vercel/Netlify 같은 serverless는 파일 저장이 유지되지 않아 부적합 (쓰려면 저장소를 DB로 교체 필요)
 
 ## API
+
+`GET /api/music-search?provider=youtube|apple|spotify&q=검색어`는 인증 후 곡 후보 목록을 반환한다.
+Apple Music은 기존 MusicKit 환경 설정을 사용한다. Spotify 검색은 `SPOTIFY_CLIENT_ID`/`SPOTIFY_CLIENT_SECRET` 또는 서버 계정의 `~/.concert/spotify.json` (`client_id`, `client_secret`, 권한 600)을 사용한다. 키는 저장소와 브라우저에 넣지 않는다.
+YouTube 검색은 기존 검색 페이지의 `ytInitialData`를 파싱하며, 응답 구조 변경 시 명시적인 오류를 반환한다. 공식 Data API 연결은 아직 사용하지 않는다.
+
+`npm test`로 모집 분류의 경계 조건·링크 정규화·YouTube 파싱을 검사한다. UI/API 쓰기 검증은 별도 사본과 별도 포트에서 실행하고 운영 `data.json`으로 시험하지 않는다.
 
 `POST /api/auth {code}`로 코드를 검증하고, 이후 모든 요청에 `x-access-code: <URI 인코딩된 코드>` 헤더가 필요하다 (없으면 401).
 

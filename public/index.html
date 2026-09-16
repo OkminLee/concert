@@ -9,7 +9,8 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Black+Han+Sans&family=IBM+Plex+Mono:wght@500;600&family=IBM+Plex+Sans+KR:wght@400;500;700&display=swap" rel="stylesheet" />
   <!-- ?v= 은 배포 시 구버전 자산 캐시 무효화용 — app.js·style.css 동시 갱신 -->
-  <link rel="stylesheet" href="style.css?v=11" />
+  <link rel="stylesheet" href="style.css?v=12" />
+<link rel="stylesheet" href="discovery.css?v=12" />
 </head>
 <body>
 
@@ -62,6 +63,7 @@
       <h1>합주 <em>세트리스트</em></h1>
     </div>
     <nav class="top-actions">
+      <button id="btn-add-song" class="submit" type="button">＋ 곡 추가</button>
       <button id="btn-feedback" class="ghost" type="button">개선 제안</button>
       <button id="btn-help" class="ghost" type="button">사용법</button>
       <button id="btn-me" class="me-chip" type="button" title="프로필 변경"></button>
@@ -79,6 +81,16 @@
       </button>
       <div class="composer-body">
       <div class="acc-clip">
+      <section class="music-finder" aria-label="음악 서비스에서 검색">
+        <div id="music-providers" class="music-providers">
+          <button type="button" data-provider="youtube" class="on" aria-pressed="true">YouTube</button>
+          <button type="button" data-provider="apple" aria-pressed="false">Apple Music</button>
+          <button type="button" data-provider="spotify" aria-pressed="false">Spotify</button>
+        </div>
+        <form id="music-search-form"><input id="music-query" type="search" maxlength="150" placeholder="곡명이나 뮤지션 검색" aria-label="음악 서비스 검색어" required /><button type="submit">검색</button></form>
+        <p id="music-status" role="status">검색 결과를 고르면 아래에 곡 정보가 채워져요.</p>
+        <div id="music-results"></div>
+      </section>
       <form id="song-form">
         <div class="link-row">
           <input id="f-link" type="url" placeholder="곡 링크 (YouTube · Spotify · SoundCloud)" autocomplete="off" />
@@ -112,8 +124,8 @@
     </section>
 
     <!-- 곡 리스트 -->
-    <section>
-      <h2 class="section-title">곡 리스트 <span id="song-count"></span></h2>
+    <section id="song-workspace">
+      <h2 class="section-title">곡 보관함 <span id="song-count"></span></h2>
       <div class="list-toolbar">
         <div class="filters" id="filters">
           <button type="button" class="filter on" data-filter="all">전체 <span class="cnt"></span></button>
@@ -122,9 +134,14 @@
           <button type="button" class="filter mine" data-filter="mine">내 곡 <span class="cnt"></span></button>
         </div>
         <input id="search" type="search" placeholder="곡 · 뮤지션 · 멤버 검색" autocomplete="off" />
+        <select id="role-filter" aria-label="빈자리 필터"><option value="">모든 파트</option><option value="vocal">보컬 빈자리</option><option value="guitar">기타 빈자리</option><option value="bass">베이스 빈자리</option><option value="drum">드럼 빈자리</option><option value="keyboard">키보드 빈자리</option></select>
+        <select id="song-sort" aria-label="곡 정렬"><option value="latest">최근 추가순</option><option value="title">곡명순</option><option value="artist">뮤지션순</option></select>
+        <button type="button" id="layout-toggle" class="ghost">목록 보기</button>
         <button type="button" id="btn-export" class="ghost" title="현재 목록으로 플레이리스트 추출">플레이리스트</button>
       </div>
+      <div id="stage-filters" class="stage-filters" aria-label="모집 단계"></div>
       <div id="songs"></div>
+      <dialog id="song-dialog" aria-label="곡 상세"><button id="song-dialog-close" type="button" class="ghost">닫기</button><div id="song-dialog-body"></div></dialog>
     </section>
   </main>
 
@@ -213,6 +230,7 @@
     </div>
   </dialog>
 
-  <script src="app.js?v=11"></script>
+  <script src="discovery.js?v=12"></script>
+  <script src="app.js?v=12"></script>
 </body>
 </html>
