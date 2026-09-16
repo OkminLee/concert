@@ -1566,14 +1566,10 @@ $('#stage-filters').addEventListener('click', e => {
 $('#song-dialog-close').addEventListener('click', () => $('#song-dialog').close());
 const songDialog = $('#song-dialog');
 let cardBackdropPressed = false;
-function outsideCardDialog(event) {
-  const rect = songDialog.getBoundingClientRect();
-  return event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom;
-}
-songDialog.addEventListener('pointerdown', event => { cardBackdropPressed = outsideCardDialog(event); });
+songDialog.addEventListener('pointerdown', event => { cardBackdropPressed = event.target === songDialog; });
 songDialog.addEventListener('pointercancel', () => { cardBackdropPressed = false; });
 songDialog.addEventListener('click', event => {
-  const dismiss = cardBackdropPressed && outsideCardDialog(event);
+  const dismiss = cardBackdropPressed && event.target === songDialog;
   cardBackdropPressed = false;
   if (dismiss) songDialog.close();
 });
