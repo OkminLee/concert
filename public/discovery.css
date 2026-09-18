@@ -90,6 +90,8 @@ main { max-width:1600px; padding:18px 24px 60px; }
 .music-result a { color:var(--ink-dim); font-size:11px; white-space:nowrap; }
 .music-result button { white-space:nowrap; font:inherit; font-size:12px; padding:7px 10px; cursor:pointer; background:#2e2a40; border:1px solid #565067; color:#d1caff; }
 .music-result button:disabled { opacity:.4; cursor:default; }
+.music-badges { display:flex; flex-wrap:wrap; gap:4px; }
+.music-badge { display:inline-block; margin-top:6px; border:1px solid #514b69; border-radius:4px; background:#292637; color:#d1caff; padding:2px 6px; font-size:10px; line-height:1.5; }
 .music-providers button:focus-visible,.stage-filters button:focus-visible { outline:2px solid var(--amber); outline-offset:2px; }
 .site-menu,.view-options { position:relative; }
 .site-menu summary,.view-options summary,#gig-summary summary { cursor:pointer; color:var(--ink-dim); font-size:12px; padding:10px; }

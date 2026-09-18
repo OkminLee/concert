@@ -30,6 +30,7 @@ function fixture(id, filled) {
           if(searchFail) {status=503;body={error:'검색 연결 실패'};}
           else {const provider=url.searchParams.get('provider');body={results:[{id:provider,title:'검색곡 '+provider,artist:'Channel / Artist',url:'https://example.com/'+provider,artwork:'',duration:'3:00'}]};}
         }
+        else if(path === '/api/music-labels') body={results:[]};
         else if(path === '/api/songs' && req.method()==='POST') {
           saveCount++; await new Promise(r=>setTimeout(r,180));
           if(saveFail) {status=503;body={error:'저장 실패: 다시 시도'};}

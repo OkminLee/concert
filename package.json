@@ -6,7 +6,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
-    "test": "node --test discovery.test.js"
+    "test": "node --test discovery.test.js music-labels.test.js"
   },
   "dependencies": {
     "express": "^4.22.2"

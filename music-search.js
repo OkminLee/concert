@@ -54,9 +54,21 @@ async function spotifyAuth() {
   return spotifyToken.value;
 }
 const duration = ms => ms ? Math.floor(ms / 60000) + ':' + String(Math.floor(ms / 1000) % 60).padStart(2, '0') : '';
-function install(app, appleToken) {
+function install(app, appleToken, labeler = require('./music-labels').createLabeler()) {
   const cache = new Map();
   const requests = new Map();
+  // Only classify metadata obtained by our authenticated search endpoint.
+  app.get('/api/music-labels', async (req, res) => {
+    const provider = req.query.provider;
+    const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';
+    if (!['youtube', 'apple', 'spotify'].includes(provider) || !q || q.length > 150)
+      return res.status(400).json({ error: '서비스와 검색어를 확인해주세요.' });
+    const cached = cache.get(provider + ':' + q.toLowerCase());
+    if (!cached || cached.exp <= Date.now()) return res.status(410).json({ error: '검색 결과가 만료됐어요.' });
+    res.set('Cache-Control', 'no-store');
+    try { res.json({ results: await labeler.classify(cached.results) }); }
+    catch { res.status(503).json({ error: '버전 표시를 사용할 수 없어요.' }); }
+  });
   app.get('/api/music-search', async (req, res) => {
     const provider = req.query.provider;
     const q = typeof req.query.q === 'string' ? req.query.q.trim() : '';

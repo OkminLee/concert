@@ -1688,6 +1688,27 @@ function invalidateMusicSearch() {
   musicResults = [];
   $('#music-results').replaceChildren();
 }
+async function loadMusicLabels(provider, q, sequence) {
+  try {
+    const data = await api('/api/music-labels?' + new URLSearchParams({ provider, q }));
+    if (sequence !== musicRequest || !accessCode) return;
+    const labels = new Map(data.results.map(r => [r.id, r]));
+    const names = { live: '라이브', cover: '커버', tutorial: '강좌' };
+    musicResults.forEach((r, i) => {
+      const target = $('#music-results [data-labels="' + i + '"]');
+      if (!target) return;
+      target.replaceChildren(...(labels.get(r.id)?.badges || []).filter(b => names[b]).map(b => {
+        const badge = document.createElement('span');
+        badge.className = 'music-badge'; badge.textContent = names[b];
+        badge.title = '제목·아티스트 정보를 바탕으로 한 자동 분류예요.';
+        return badge;
+      }));
+    });
+    if (data.results.some(r => r.unavailable)) $('#music-status').textContent += ' 일부 버전 표시는 사용할 수 없어요.';
+  } catch {
+    if (sequence === musicRequest && accessCode) $('#music-status').textContent += ' 버전 표시는 잠시 사용할 수 없어요. 곡 선택은 가능해요.';
+  }
+}
 $('#music-providers').addEventListener('click', e => {
   const btn = e.target.closest('[data-provider]');
   if (!btn) return;
@@ -1707,20 +1728,22 @@ $('#music-search-form').addEventListener('submit', async e => {
   const q = $('#music-query').value.trim();
   if (!q) return;
   const sequence = ++musicRequest;
+  const provider = musicProvider;
   musicResults = [];
   $('#music-results').replaceChildren();
   $('#music-status').textContent = '검색 중…';
   try {
-    const data = await api('/api/music-search?' + new URLSearchParams({ provider: musicProvider, q }));
+    const data = await api('/api/music-search?' + new URLSearchParams({ provider, q }));
     if (sequence !== musicRequest || !accessCode) return;
     musicResults = data.results;
     $('#music-status').textContent = musicResults.length ? musicResults.length + '개 결과 · 곡을 선택한 뒤 파트 정원을 확인해주세요.' : '검색 결과가 없어요. 다른 검색어로 찾아보세요.';
     $('#music-results').innerHTML = musicResults.map((r, i) => {
       const duplicate = songs.some(s => Discovery.linkKey(s.link) === Discovery.linkKey(r.url));
       return '<div class="music-result">' + (r.artwork ? '<img src="' + esc(r.artwork) + '" alt="" loading="lazy">' : '') +
-        '<div><strong>' + esc(r.title) + '</strong><small>' + esc(r.artist) + ' · ' + esc(r.duration) + '</small></div>' +
+        '<div><strong>' + esc(r.title) + '</strong><small>' + esc(r.artist) + ' · ' + esc(r.duration) + '</small><div class="music-badges" data-labels="' + i + '"></div></div>' +
         '<a href="' + esc(r.url) + '" target="_blank" rel="noopener">듣기</a><button type="button" data-pick="' + i + '" ' + (duplicate ? 'disabled' : '') + '>' + (duplicate ? '등록됨' : '선택') + '</button></div>';
     }).join('');
+    if (musicResults.length) void loadMusicLabels(provider, q, sequence);
   } catch (err) {
     if (sequence === musicRequest && accessCode) $('#music-status').textContent = err.message;
   }
