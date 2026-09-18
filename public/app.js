@@ -1689,24 +1689,33 @@ function invalidateMusicSearch() {
   $('#music-results').replaceChildren();
 }
 async function loadMusicLabels(provider, q, sequence) {
+  const pendingText = ' 버전 확인 중…';
+  const finish = message => {
+    if (sequence === musicRequest && accessCode)
+      $('#music-status').textContent = $('#music-status').textContent.replace(pendingText, '') + ' ' + message;
+  };
+  $('#music-status').textContent += pendingText;
   try {
     const data = await api('/api/music-labels?' + new URLSearchParams({ provider, q }));
     if (sequence !== musicRequest || !accessCode) return;
     const labels = new Map(data.results.map(r => [r.id, r]));
     const names = { live: '라이브', cover: '커버', tutorial: '강좌' };
+    let badgeCount = 0;
     musicResults.forEach((r, i) => {
       const target = $('#music-results [data-labels="' + i + '"]');
       if (!target) return;
       target.replaceChildren(...(labels.get(r.id)?.badges || []).filter(b => names[b]).map(b => {
         const badge = document.createElement('span');
+        badgeCount++;
         badge.className = 'music-badge'; badge.textContent = names[b];
         badge.title = '제목·아티스트 정보를 바탕으로 한 자동 분류예요.';
         return badge;
       }));
     });
-    if (data.results.some(r => r.unavailable)) $('#music-status').textContent += ' 일부 버전 표시는 사용할 수 없어요.';
+    if (data.results.some(r => r.unavailable)) finish('일부 버전 표시는 사용할 수 없어요. 곡 선택은 가능해요.');
+    else finish(badgeCount ? '버전 확인 완료.' : '버전 확인 완료 · 표시할 버전 정보가 없어요.');
   } catch {
-    if (sequence === musicRequest && accessCode) $('#music-status').textContent += ' 버전 표시는 잠시 사용할 수 없어요. 곡 선택은 가능해요.';
+    finish('버전 표시는 잠시 사용할 수 없어요. 곡 선택은 가능해요.');
   }
 }
 $('#music-providers').addEventListener('click', e => {

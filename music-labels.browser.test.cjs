@@ -18,7 +18,7 @@ const assert = require('node:assert/strict');
       else if (url.pathname === '/api/music-labels') {
         if (labelMode === 'slow') { pending = true; await new Promise(r => { release = r; }); }
         if (labelMode === 'fail') { status = 503; body = { error: 'unavailable' }; }
-        else body = { results: [{ id: url.searchParams.get('provider'), badges: ['live', 'cover'] }] };
+        else body = { results: [{ id: url.searchParams.get('provider'), badges: labelMode === 'empty' ? [] : ['live', 'cover'] }] };
       } else throw new Error('Unexpected API ' + url.pathname);
       await route.fulfill({ status, contentType: 'application/json', body: JSON.stringify(body) });
     });
@@ -29,6 +29,7 @@ const assert = require('node:assert/strict');
     await page.locator('[data-pick="0"]').waitFor();
     assert.equal(await page.locator('[data-pick="0"]').isEnabled(), true);
     while (!pending) await new Promise(r => setTimeout(r, 10));
+    assert.match(await page.locator('#music-status').innerText(), /버전 확인 중/);
     // A stale response must not label a new, cleared search.
     await page.locator('#music-query').fill('second'); release();
     await page.waitForTimeout(100);
@@ -41,6 +42,12 @@ const assert = require('node:assert/strict');
     await page.locator('[data-pick="0"]').click();
     assert.equal(await page.locator('#f-title').inputValue(), 'Test result');
     await page.locator('#change-song').click();
+    labelMode = 'empty';
+    await page.locator('#music-query').fill('empty');
+    await page.locator('#music-search-form').evaluate(el => el.requestSubmit());
+    await page.waitForFunction(() => document.querySelector('#music-status').textContent.includes('표시할 버전 정보가 없어요'));
+    assert.equal(await page.locator('.music-badge').count(), 0);
+    assert.equal(await page.locator('[data-pick="0"]').isEnabled(), true);
     labelMode = 'fail';
     await page.locator('#music-query').fill('failure');
     await page.locator('#music-search-form').evaluate(el => el.requestSubmit());
