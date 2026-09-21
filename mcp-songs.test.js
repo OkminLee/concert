@@ -21,6 +21,11 @@ test('MCP adds songs through the same validation and duplicate guard as the web'
     const saved=JSON.parse(add.result.content[0].text).song;
     assert.equal(saved.title,'Example');assert.equal(saved.createdBy,'Tester');assert.equal(saved.sessions.guitar.capacity,2);
     assert.deepEqual(saved.sessions.guitar.applicants,[]);
+    const patch=async(body)=>{const r=await fetch('http://localhost:13931/api/songs/'+saved.id,{method:'PATCH',headers:{'content-type':'application/json','x-access-code':'test-only'},body:JSON.stringify(body)});return {status:r.status,body:await r.json()};};
+    const invalid=await patch({createdBy:'unknown',slots:{guitar:9}});assert.equal(invalid.status,400);
+    const corrected=await patch({createdBy:'tester',slots:{vocal:1,guitar:2,bass:1,drum:1,keyboard:1}});
+    assert.equal(corrected.status,200);assert.equal(corrected.body.createdBy,'Tester');assert.equal(corrected.body.slots.keyboard,1);
+    assert.deepEqual(corrected.body.members.guitar,[]);assert.equal(corrected.body.id,saved.id);
     const repeat=await call('tools/call',{name:'add_song',arguments:{...args,link:'https://www.youtube.com/watch?v=abc123&list=track'}});
     assert.equal(repeat.result.isError,true);
     for(const change of [{name:'unknown'},{title:''},{title:42},{link:'javascript:alert(1)'}]){

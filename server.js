@@ -154,7 +154,9 @@ function createSong({ title, artist, link, slots, nickname }) {
 app.patch('/api/songs/:id', (req, res) => {
   const song = findSong(req, res);
   if (!song) return;
-  const { title, artist, link, slots } = req.body || {};
+  const { title, artist, link, slots, createdBy } = req.body || {};
+  const proposer = createdBy === undefined ? null : canonicalMember(createdBy);
+  if (proposer?.error) return res.status(400).json({ error: proposer.error });
   if (title !== undefined) {
     if (!title.trim()) return res.status(400).json({ error: '곡 이름은 비울 수 없어요' });
     song.title = title.trim();
@@ -162,6 +164,7 @@ app.patch('/api/songs/:id', (req, res) => {
   if (artist !== undefined) song.artist = artist.trim();
   if (link !== undefined) song.link = cleanLink(link);
   if (slots !== undefined) song.slots = cleanSlots(slots);
+  if (proposer) song.createdBy = proposer.name;
   save();
   res.json(song);
 });
