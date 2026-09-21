@@ -66,3 +66,12 @@ YouTube 검색은 기존 검색 페이지의 `ytInitialData`를 파싱하며, �
 | POST | `/api/songs/:id/comments` | 코멘트 작성 |
 | DELETE | `/api/songs/:id/comments/:cid` | 코멘트 삭제 |
 | POST | `/api/parse-link` | 링크 → `{artist, title}` 자동 분해 |
+## MCP에서 곡 등록
+
+`/mcp`의 `add_song`으로 새 신청곡을 등록할 수 있습니다. 웹과 같은 `x-access-code` 인증을 사용합니다.
+
+- 필수: `title`(곡명), `name`(등록 요청자의 멤버 프로필 이름)
+- 선택: `artist`, `link`(http/https), `slots`(vocal/guitar/bass/drum/keyboard별 정원)
+- 등록 전 `list_songs`로 기존 곡을 확인합니다. 같은 영상 링크는 추적 파라미터가 달라도 중복 등록되지 않습니다.
+- 정원을 모르면 `slots`를 생략합니다. 정원 미설정으로 등록되며, 참가 신청은 별도입니다.
+- 도구 목록을 캐시하는 클라이언트는 MCP 연결 또는 도구 목록을 새로고침해야 합니다.

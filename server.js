@@ -120,12 +120,20 @@ app.get('/api/songs', (req, res) => {
 
 // ---- 곡 추가 ----
 app.post('/api/songs', (req, res) => {
-  const { title, artist, link, slots, nickname } = req.body || {};
-  if (!nickname?.trim()) return res.status(400).json({ error: '닉네임이 필요해요' });
-  if (!title?.trim()) return res.status(400).json({ error: '곡 이름이 필요해요' });
+  const result = createSong(req.body || {});
+  if (result.error) return res.status(result.status).json({ error: result.error });
+  res.status(201).json(result.song);
+});
+
+function createSong({ title, artist, link, slots, nickname }) {
+  if (typeof nickname !== 'string' || !nickname.trim()) return {status:400,error:'닉네임이 필요해요'};
+  if (typeof title !== 'string' || !title.trim()) return {status:400,error:'곡 이름이 필요해요'};
+  if (artist !== undefined && typeof artist !== 'string') return {status:400,error:'뮤지션은 문자열이어야 해요'};
+  if (link !== undefined && (typeof link !== 'string' || (link.trim() && !cleanLink(link))))
+    return {status:400,error:'곡 링크는 http(s) 주소여야 해요'};
   const key = linkKey(cleanLink(link));
   if (key && db.songs.some(s => linkKey(s.link) === key))
-    return res.status(409).json({ error: '이미 등록된 곡 링크예요. 기존 곡에서 참여해주세요.' });
+    return {status:409,error:'이미 등록된 곡 링크예요. 기존 곡에서 참여해주세요.'};
   const song = {
     id: crypto.randomUUID(),
     title: title.trim(),
@@ -139,8 +147,8 @@ app.post('/api/songs', (req, res) => {
   };
   db.songs.unshift(song);
   save();
-  res.status(201).json(song);
-});
+  return {song};
+}
 
 // ---- 곡 수정 (곡명·뮤지션·링크·세션 정원) ----
 app.patch('/api/songs/:id', (req, res) => {
@@ -513,6 +521,22 @@ require('./music-search').install(app, appleDeveloperToken);
 const MCP_PROTOCOL_VERSIONS = ['2024-11-05', '2025-03-26', '2025-06-18'];
 const MCP_TOOLS = [
   {
+    name: 'add_song',
+    description: '새 합주 신청곡을 추가한다. 먼저 list_songs로 중복을 확인한다. 신청자 name은 등록된 멤버 이름이다. slots를 모르면 생략하여 정원 미설정으로 등록한다. 세션 참가는 별도다.',
+    inputSchema: {
+      type: 'object',
+      properties: {
+        title: {type:'string',description:'곡 제목'},
+        artist: {type:'string',description:'뮤지션'},
+        link: {type:'string',description:'원곡·연습 영상의 http(s) 주소'},
+        name: {type:'string',description:'등록 요청자의 멤버 프로필 이름'},
+        slots: {type:'object',properties:Object.fromEntries(SESSIONS.map(s=>[s,{type:'integer',minimum:0}])),additionalProperties:false},
+      },
+      required:['title','name'],
+      additionalProperties:false,
+    },
+  },
+  {
     name: 'list_songs',
     description:
       '합주 신청곡 전체 목록과 세션별(vocal·guitar·bass·drum·keyboard) 신청 현황을 조회한다. 곡의 song_id는 여기서 얻는다.',
@@ -621,6 +645,13 @@ function mcpToolResult(payload, isError) {
 }
 
 function runMcpTool(name, args) {
+  if (name === 'add_song') {
+    const who = canonicalMember(args.name);
+    if (who.error) return mcpToolResult(who.error, true);
+    const result = createSong({...args,nickname:who.name});
+    if (result.error) return mcpToolResult(result.error, true);
+    return mcpToolResult({ok:true,song:songSummary(result.song)});
+  }
   if (name === 'list_songs')
     return mcpToolResult({ sessions: SESSIONS, songs: db.songs.map(songSummary) });
   if (name === 'get_schedule') return mcpToolResult(db.schedule);
