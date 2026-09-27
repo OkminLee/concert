@@ -399,6 +399,28 @@ app.post('/api/feedback', (req, res) => {
 });
 
 // ---- 링크 자동 분해: oEmbed 로 제목·뮤지션 추출 ----
+const previewCache = new Map();
+app.post('/api/link-preview', async (req,res) => {
+  let url;try{url=new URL(req.body?.url);}catch{return res.status(400).json({error:'잘못된 링크예요'});}
+  if(!['http:','https:'].includes(url.protocol)||url.username||url.password||url.href.length>4096)return res.status(400).json({error:'잘못된 링크예요'});
+  const host=url.hostname.replace(/^www\./,''),base={title:host,site:host,author:'',thumbnail:null,available:false};
+  if(['youtu.be','youtube.com','m.youtube.com','music.youtube.com'].includes(host)){
+    const id=host==='youtu.be'?url.pathname.slice(1):url.searchParams.get('v')||url.pathname.match(/^\/(?:shorts|embed)\/([^/]+)/)?.[1];
+    if(id&&/^[\w-]{11}$/.test(id)){base.title='YouTube 동영상';base.thumbnail='https://i.ytimg.com/vi/'+id+'/hqdefault.jpg';base.available=true;}
+  }
+  if(!['youtu.be','youtube.com','m.youtube.com','music.youtube.com','open.spotify.com','soundcloud.com','m.soundcloud.com'].includes(host))return res.json(base);
+  const key=url.href,cached=previewCache.get(key);
+  if(cached&&cached.expires>Date.now())return res.json(await cached.value);
+  const value=(async()=>{try{
+    const r=await fetch(oembedEndpoint(key),{signal:AbortSignal.timeout(4000),redirect:'error'});
+    if(!r.ok)return base;const m=await r.json();
+    let thumbnail=null;try{const image=new URL(m.thumbnail_url);if(image.protocol==='https:')thumbnail=image.href;}catch{}
+    return {...base,available:true,title:typeof m.title==='string'?m.title.slice(0,500):host,author:typeof m.author_name==='string'?m.author_name.slice(0,200):'',thumbnail};
+  }catch{return base;}})();
+  if(previewCache.size>=200)previewCache.delete(previewCache.keys().next().value);
+  const entry={expires:Date.now()+3600000,value};previewCache.set(key,entry);
+  const result=await value;if(result===base)entry.expires=Date.now()+30000;res.json(result);
+});
 function oembedEndpoint(url) {
   let host;
   try {

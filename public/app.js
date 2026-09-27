@@ -989,7 +989,7 @@ function songCard(song, idx) {
       return `
         <div class="comment">
           <span class="author">${avatarImg(c.author)}${esc(c.author)}</span>
-          <span class="text">${esc(c.text)}</span>
+          <span class="text">${CommentLinks.render(c.text)}</span>
           <span class="reacts">
             ${reactChips}
             <span class="react-add-wrap">
@@ -1086,6 +1086,7 @@ function filterCounts() {
 
 // keyed diff 렌더 — 바뀐 카드만 DOM 교체 (이미지 재로드·애니메이션 재생 방지)
 const cardCache = new Map(); // song.id -> 마지막 렌더 HTML
+for(const container of [$('#songs'),$('#song-dialog-body')])new MutationObserver(() => CommentLinks.hydrate(container, api)).observe(container, {childList:true,subtree:true});
 
 function render() {
   const container = $('#songs');
