@@ -135,6 +135,7 @@ function login(name) {
   syncGate();
   render(); // 내 곡 카운트·칩 하이라이트·참가 버튼 등 me 의존 UI 갱신
   renderSchedule(); // 일정 그리드의 '내 가능 시간' 표시도 me 의존
+  openSharedSong();
 }
 $('#gate-profiles').addEventListener('click', (e) => {
   const btn = e.target.closest('.profile');
@@ -1035,6 +1036,7 @@ function songCard(song, idx) {
             <span class="detail-foot">${song.artist ? `${esc(song.artist)} · ` : ''}제안 ${esc(song.createdBy)}</span>
             <span class="detail-meta">
               ${song.link ? `<a href="${esc(song.link)}" target="_blank" rel="noopener">곡 듣기 ↗</a>` : ''}
+              <button type="button" class="icon-btn" data-act="share" title="곡 카드 공유" aria-label="곡 카드 공유">${ICONS.send} 공유</button>
               <button type="button" class="icon-btn" data-act="edit" title="수정">${ICONS.pencil}</button>
               <button type="button" class="icon-btn" data-act="delete" title="삭제">${ICONS.trash}</button>
             </span>
@@ -1162,6 +1164,30 @@ function updateCard(song) {
 }
 
 let firstPaint = true;
+let sharedSongHandled = false;
+function openSharedSong() {
+  if (sharedSongHandled || !accessCode || !me || firstPaint) return;
+  const id = new URLSearchParams(location.search).get('song');
+  if (!id) return;
+  sharedSongHandled = true;
+  if (!songs.some(s => s.id === id)) { alert('공유된 곡을 찾을 수 없어요. 삭제된 곡일 수 있어요.'); return; }
+  filter='all';roleFilter='';mineOnly=false;query='';
+  $('#role-filter').value='';$('#search').value='';
+  render();
+  [...document.querySelectorAll('.song')].find(el=>el.dataset.id===id)?.querySelector('[data-act="toggle"]').click();
+}
+async function shareSong(song,btn) {
+  const url=new URL(location.pathname,location.origin);url.searchParams.set('song',song.id);
+  const title=[song.title,song.artist].filter(Boolean).join(' — ');
+  if(navigator.share){
+    try{await navigator.share({title,text:title,url:url.href});return;}
+    catch(e){if(e.name==='AbortError')return;}
+  }
+  try{
+    await navigator.clipboard.writeText(url.href);
+    const label=btn.innerHTML;btn.textContent='링크 복사됨';setTimeout(()=>{btn.innerHTML=label;},2500);
+  }catch{prompt('아래 곡 카드 링크를 복사해주세요.',url.href);}
+}
 async function load() {
   songs = (await api('/api/songs')).songs;
   if (firstPaint) {
@@ -1171,6 +1197,7 @@ async function load() {
     setTimeout(() => $('#songs').classList.remove('intro'), 700);
   }
   render();
+  openSharedSong();
 }
 
 // 폴링: 변경 없으면 재렌더 생략, 변경 시 작성 중이던 코멘트 입력 보존
@@ -1211,6 +1238,9 @@ $('#song-workspace').addEventListener('click', async (e) => {
   const song = songs.find((s) => s.id === id);
   try {
     switch (btn.dataset.act) {
+      case 'share':
+        await shareSong(song,btn);
+        return;
       case 'toggle': {
         // DOM 재생성 없이 클래스만 토글 — 깜빡임 제거
         const willOpen = !expanded.has(id);
